@@ -1,1 +1,0 @@
-#Maquina de estados y validaciones de transición

@@ -1,1 +1,0 @@
-#Pydantic (envio, evento, filtros)
