@@ -1,0 +1,1 @@
+#helpers reutilizables (timestamp, validación de código, lectura/escritura segura, dedupe).
