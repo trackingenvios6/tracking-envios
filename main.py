@@ -1,5 +1,5 @@
 from n8n_client import send_query, new_session_id
-from data_models import N8NRequest
+from data_models import N8nRequest #se define en data_models.py
 from report_generator import generate_excel_csv
 import re
 
@@ -21,7 +21,7 @@ def handle_opcion_1(session_id: str):
     if not validar_codigo_envio(codigo):
         print("Código de envío inválido. Debe contener entre 10 y 20 caracteres alfanuméricos.")
         return
-    req = N8nRequest( #se define en data_models.py
+    req = N8nRequest( 
         chat_input = f"Consultar estado del envío con código {codigo}",
         session_id = session_id
         intent = "consultar_estado",
@@ -34,7 +34,7 @@ def handle_opcion_1(session_id: str):
         print(f"Error al consultar el envío: {res.message}")
 
 def handle_opcion_2(session_id):
-    req = N8NRequest(
+    req = N8nRequest(
         chat_input = "Generar reporte de envíos fallidos",
         session_id = session_id,
         intent = "reporte_fallidos",
@@ -54,7 +54,7 @@ def handle_opcion_3(session_id: str):
     if not localidad and not repartidor:
         print("Debe proporcionar al menos una localidad o un repartidor para generar el reporte.")
         return
-    req = N8NRequest(
+    req = N8nRequest(
         chat_input = f"Generar reporte de localidad o repartidor",
         session_id = session_id,
         intent = "reporte_repartidor_localidad",
@@ -76,7 +76,7 @@ def handle_opcion_4(session_id: str):
     if not consulta:
         print("La consulta no puede estar vacía.")
         return
-    req = N8NRequest(
+    req = N8nRequest(
         chat_input = consulta,
         session_id = session_id,
         intent = "consulta_personalizada",
