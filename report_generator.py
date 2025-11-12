@@ -2,22 +2,28 @@ import os
 import pandas as pd
 from config import REPORTS_DIR
 
-def _ensure_reports_dir():
-    """Ensure that the reports directory exists."""
-    if not os.path.exists(REPORTS_DIR):
-        os.makedirs(REPORTS_DIR)
+def _ensure_reports_dir() -> None:
+    """Crea la carpeta de reportes si no existe."""
+    os.makedirs(REPORTS_DIR, exist_ok=True)
 
-def generate_excel_csv_report(data, report_name):
+def generate_excel_csv_report(data_list: list[dict], filename: str, to: str = "xlsx") -> str:
     """
-    dat_list : lista de dicts [{'codigo': 'AB123', 'estado': 'EN_TRANSITO' }, ...]
-    filename: nombre sin extensión (p.ej. 'envios_fallidos')
-    to:  'xlsx' o 'csv'
-    return: ruta completa del archivo generado
+    Genera un archivo Excel o CSV a partir de una lista de diccionarios.
+
+    Args:
+        data_list (list[dict]): Lista de registros, ej. [{'codigo': 'AB123', 'estado': 'EN_TRANSITO'}, ...]
+        filename (str): Nombre base del archivo (sin extensión).
+        to (str): Formato de salida ('xlsx' o 'csv'). Por defecto 'xlsx'.
+
+    Returns:
+        str: Ruta completa del archivo generado.
     """
     _ensure_reports_dir()
-    
+
+    # Crear DataFrame incluso si la lista está vacía
     df = pd.DataFrame(data_list or [])
 
+    # Construir ruta final
     path = os.path.join(REPORTS_DIR, f"{filename}.{to.lower()}")
 
     if to.lower() == 'csv':
