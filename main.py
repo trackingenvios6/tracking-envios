@@ -21,11 +21,12 @@ def handle_opcion_1(session_id: str):
     if not validar_codigo_envio(codigo):
         print("Código de envío inválido. Debe contener entre 10 y 20 caracteres alfanuméricos.")
         return
+    
     req = N8nRequest( 
         chat_input = f"Consultar estado del envío con código {codigo}",
-        session_id = session_id
+        session_id = session_id,
         intent = "consultar_estado",
-        params = {"codigo": codigo},
+        params = {"codigo": codigo}
     )
     res = send_query(req)
     if res.ok:
