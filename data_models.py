@@ -5,7 +5,7 @@ class N8nRequest:
         self.intent = intent
         self.params = params if params is not None else {}
 
-class N8nRequest: 
+class N8nResponse: 
     def __init__(self, ok, message = None, data = None, error = None):
         self.ok = ok
         self.message = message

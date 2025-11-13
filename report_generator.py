@@ -6,7 +6,7 @@ def _ensure_reports_dir() -> None:
     """Crea la carpeta de reportes si no existe."""
     os.makedirs(REPORTS_DIR, exist_ok=True)
 
-def generate_excel_csv_report(data_list: list[dict], filename: str, to: str = "xlsx") -> str:
+def generate_excel_csv(data_list: list[dict], filename: str, to: str = "xlsx") -> str:
     """
     Genera un archivo Excel o CSV a partir de una lista de diccionarios.
 
