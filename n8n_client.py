@@ -34,7 +34,7 @@ def send_query(req):
         
         return N8nResponse(
                 ok = data.get("ok", False),
-                menssage = data.get("message"),
+                message = data.get("message"),
                 data = data.get("data"),
             )
     except requests.RequestException as e:
