@@ -63,7 +63,7 @@ def enviar_mensaje_n8n(session_id, mensaje):
         "chatInput": mensaje
     }
     try:
-        # Aumento el timeout a 30s
+
         response = requests.post(N8N_WEBHOOK_URL, json=payload, timeout=300)
 
         if response.status_code == 200:
@@ -148,7 +148,7 @@ def main():
                 mostrar_respuesta_animada(texto_respuesta)
                 st.session_state.historial_chat.append({"rol": "assistant", "texto": texto_respuesta})
             else:
-                # ✅ Caso en que el flujo devuelve data (como en tu ejemplo de Postman)
+
                 if "data" in respuesta_n8n:
                     envio = respuesta_n8n["data"]
                     llegada = formatear_fecha(envio.get("Llegada Estimada", "N/D"))
