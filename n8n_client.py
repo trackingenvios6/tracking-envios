@@ -30,7 +30,7 @@ def send_query(req):
         except ValueError:
             return N8nResponse(
                 ok = True, 
-                menssage = rta.text,)
+                message = rta.text,)
         
         return N8nResponse(
                 ok = data.get("ok", False),
