@@ -1,14 +1,14 @@
-from n8n_client import send_query, new_session_id 
-from data_models import N8nRequest
+import json
+import re
+from n8n_client import enviar_consulta, nuevo_id_sesion
+from data_models import SolicitudN8n
 from report_generator import generar_reporte, solicitar_configuracion_salida 
-import re 
 
 
 APP_TITLE = "Bienvenido a Piki. Tu envío, sin estrés." 
 
 
 def validar_codigo_envio(codigo: str) -> bool: 
-
     return bool(re.fullmatch(r'[A-Z0-9]{1,20}', codigo.strip(), flags=re.I)) 
 
 
@@ -29,6 +29,7 @@ def menu_compartir():
     print("[4] Volver al menú principal")
     print("[0] Salir")
 
+
 def menu_local():
     print(f"=== {APP_TITLE} ===") 
     print("[1] Descargar el reporte de envíos fallidos") 
@@ -36,6 +37,7 @@ def menu_local():
     print("[3] Consulta personalizada")
     print("[4] Volver al menú principal")
     print("[0] Salir")
+
 
 def menu_plataforma_compartir():
     print("=== Seleccione la plataforma para compartir ===")
@@ -45,6 +47,7 @@ def menu_plataforma_compartir():
     print("[4] Volver al menú anterior")
     print("[0] Salir")
 
+
 def mostrar_resultado_reporte(path: str, destino: str = "") -> None:
     if destino == "compartir":
         print(f"Reporte generado y listo para compartir en plataforma: {path}")
@@ -53,20 +56,80 @@ def mostrar_resultado_reporte(path: str, destino: str = "") -> None:
     else:
         print(f"Reporte generado exitosamente: {path}")
 
+
+def obtener_mensaje_desde_data(data) -> str | None:
+    """Extrae el mensaje de la IA desde diferentes estructuras de datos"""
+    if isinstance(data, dict):
+        return data.get("mensaje_ia") or data.get("mensaje") or data.get("message")
+    if isinstance(data, list) and data and isinstance(data[0], dict):
+        return data[0].get("mensaje_ia") or data[0].get("mensaje") or data[0].get("message")
+    return None
+
+
+def extraer_mensaje_y_datos(res):
+    """Extrae mensaje y datos de la respuesta de n8n, manejando diferentes formatos"""
+    mensaje = res.mensaje
+    datos = res.datos
+    
+    if isinstance(res.datos, str):
+        try:
+            parsed = json.loads(res.datos)
+            if isinstance(parsed, dict):
+                # Intenta extraer mensaje de múltiples campos posibles
+                mensaje = (
+                    parsed.get("mensaje_ia") or 
+                    parsed.get("mensaje") or 
+                    parsed.get("message") or 
+                    mensaje
+                )
+                # Extrae datos del campo 'data' si existe, sino usa todo el parsed
+                if "data" in parsed:
+                    datos = parsed.get("data")
+                elif "datos" in parsed:
+                    datos = parsed.get("datos")
+                else:
+                    datos = parsed
+            else:
+                datos = parsed
+        except Exception:
+            pass
+    elif isinstance(res.datos, dict):
+        # Manejo específico para la estructura de n8n
+        mensaje = (
+            res.datos.get("mensaje_ia") or 
+            res.datos.get("mensaje") or 
+            res.datos.get("message") or 
+            mensaje
+        )
+        # Si hay un campo 'data' dentro, úsalo; sino usa res.datos directamente
+        if "data" in res.datos:
+            datos = res.datos.get("data")
+        elif "datos" in res.datos:
+            datos = res.datos.get("datos")
+        # Si no hay campo data/datos, mantén res.datos como está
+    
+    return mensaje, datos
+
+
 def obtener_configuracion_local() -> tuple[str, str]:
     return solicitar_configuracion_salida()
 
+
 def normalizar_registros_respuesta(datos):
+    """Normaliza diferentes formatos de respuesta a una lista de registros"""
     if datos is None:
         return []
     if isinstance(datos, list):
         return datos
     if isinstance(datos, dict):
+        # Si tiene un campo 'data' interno que es lista, úsalo
         interno = datos.get("data")
         if isinstance(interno, list):
             return interno
+        # Si no, devuelve el dict como único registro
         return [datos]
     return [datos]
+
 
 def exportar_reporte_local(data, nombre_base: str, formato: str, directorio: str) -> str | None:
     try:
@@ -80,6 +143,7 @@ def exportar_reporte_local(data, nombre_base: str, formato: str, directorio: str
     except Exception as e:
         print(f"Error al generar el reporte: {e}")
         return None
+
 
 def seleccionar_plataforma_compartir() -> str:
     while True:
@@ -97,6 +161,7 @@ def seleccionar_plataforma_compartir() -> str:
             return "salir"
         print("Opción inválida. Intente nuevamente.")
 
+
 def solicitar_email_destino() -> str:
     patron = r'^[\w\.-]+@[\w\.-]+\.[a-zA-Z]{2,}$'
     while True:
@@ -104,6 +169,7 @@ def solicitar_email_destino() -> str:
         if re.fullmatch(patron, correo):
             return correo
         print("Correo inválido. Intente nuevamente.")
+
 
 def solicitar_filtros_reparto():
     while True:
@@ -136,38 +202,41 @@ def solicitar_filtros_reparto():
             return None
         print("Opción inválida. Intente nuevamente.")
 
+
 def enviar_reporte_compartir(session_id: str, chat_input: str, descripcion: str, tipo: str, plataforma: str, params_extra = None) -> None:
-    params = {
+    parametros = {
         "tipo": tipo,
         "plataforma": plataforma,
     }
     if params_extra:
         params.update({k: v for k, v in params_extra.items() if v is not None})
 
-    req = N8nRequest(
-        chat_input = chat_input,
-        session_id = session_id,
-        intent = f"compartir_{tipo}",
-        params = params,
+    req = SolicitudN8n(
+        entrada_chat = chat_input,
+        id_sesion = session_id,
+        intencion = f"compartir_{tipo}",
+        parametros = params,
     )
-    res = send_query(req)
+    res = enviar_consulta(req)
     if res.ok:
-        if res.message:
-            print(res.message)
-        if res.data:
-            if isinstance(res.data, dict):
-                url = res.data.get("url") or res.data.get("link")
+        mensaje = obtener_mensaje_desde_data(res.datos) or res.mensaje
+        if mensaje:
+            print(mensaje)
+        if res.datos:
+            if isinstance(res.datos, dict):
+                url = res.datos.get("url") or res.datos.get("link")
                 if url:
                     print(f"Acceso directo: {url}")
-                descripcion = res.data.get("descripcion")
+                descripcion = res.datos.get("descripcion")
                 if descripcion:
                     print(descripcion)
             else:
-                print(res.data)
-        elif not res.message:
+                print(res.datos)
+        elif not mensaje:
             print("n8n procesó la solicitud correctamente.")
     else:
-        print(f"Error al compartir el reporte: {res.message}")
+        print(f"Error al compartir el reporte: {res.mensaje}")
+
 
 def consultar_estado_envio(session_id: str) -> None:
     codigo = input("Ingrese el código de envío: ").strip()
@@ -175,36 +244,40 @@ def consultar_estado_envio(session_id: str) -> None:
         print("Código de envío inválido. Debe contener entre 1 y 20 caracteres alfanuméricos.")
         return
 
-    req = N8nRequest(
-        chat_input = f"Consultar estado del envío con código {codigo}",
-        session_id = session_id,
-        intent = "consultar_estado",
-        params = {"codigo": codigo},
+    req = SolicitudN8n(
+        entrada_chat = f"Consultar estado del envío con código {codigo}",
+        id_sesion = session_id,
+        intencion = "consultar_estado",
+        parametros = {"codigo": codigo},
     )
-    res = send_query(req)
-    if res.ok:
-        if res.message:
-            print(res.message)
-        if res.data:
-            if isinstance(res.data, dict):
-                for clave, valor in res.data.items():
-                    print(f"{clave}: {valor}")
-            else:
-                print(res.data)
-        elif not res.message:
-            print("No se encontró información para el código proporcionado.")
-    else:
-        print(f"Error al consultar el envío: {res.message}")
+    res = enviar_consulta(req)
+    mensaje, datos = extraer_mensaje_y_datos(res)
+
+    if mensaje:
+        print(mensaje)
+    if datos:
+        if isinstance(datos, dict):
+            for clave, valor in datos.items():
+                print(f"{clave}: {valor}")
+        else:
+            print(datos)
+    elif not mensaje:
+        print("No se encontró información para el código proporcionado.")
+
+    if not res.ok and not mensaje:
+        print(f"Error al consultar el envío: {res.mensaje}")
+
 
 def generar_reporte_envios_fallidos(session_id: str, destino: str) -> None:
-    req = N8nRequest(
-        chat_input = "Generar reporte de envíos fallidos",
-        session_id = session_id,
-        intent = "reporte_fallidos", 
+    req = SolicitudN8n(
+        entrada_chat = "Generar reporte de envíos fallidos",
+        id_sesion = session_id,
+        intencion = "reporte_fallidos", 
     ) 
 
-    res = send_query(req)
-    registros = normalizar_registros_respuesta(res.data)
+    res = enviar_consulta(req)
+    registros = normalizar_registros_respuesta(res.datos)
+    mensaje = obtener_mensaje_desde_data(res.datos)
 
     if destino == "local":
         formato_local, directorio_local = obtener_configuracion_local()
@@ -216,24 +289,28 @@ def generar_reporte_envios_fallidos(session_id: str, destino: str) -> None:
         mostrar_resultado_reporte(path, destino)
         if not registros:
             print("Nota: el reporte no contiene registros. Revisa el archivo para más detalles.")
+    if mensaje:
+        print(mensaje)
 
     if not res.ok:
-        advertencia = res.message or "n8n no devolvió mensaje; se generó un reporte vacío."
+        advertencia = res.mensaje or "n8n no devolvió mensaje; se generó un reporte vacío."
         print(f"Advertencia: {advertencia}")
+
 
 def generar_reporte_repartidores(session_id: str, destino: str) -> None:
     filtros = solicitar_filtros_reparto()
     if not filtros:
         return
-    req = N8nRequest(
-        chat_input = "Generar reporte de localidad o repartidor",
-        session_id = session_id,
-        intent = "reporte_repartidor_localidad",
-        params = filtros,
+    req = SolicitudN8n(
+        entrada_chat = "Generar reporte de localidad o repartidor",
+        id_sesion = session_id,
+        intencion = "reporte_repartidor_localidad",
+        parametros = filtros,
     )
 
-    res = send_query(req)
-    registros = normalizar_registros_respuesta(res.data)
+    res = enviar_consulta(req)
+    registros = normalizar_registros_respuesta(res.datos)
+    mensaje = obtener_mensaje_desde_data(res.datos)
 
     if destino == "local":
         formato_local, directorio_local = obtener_configuracion_local()
@@ -245,23 +322,27 @@ def generar_reporte_repartidores(session_id: str, destino: str) -> None:
         mostrar_resultado_reporte(path, destino)
         if not registros:
             print("Nota: el reporte no contiene registros. Revisa el archivo para más detalles.")
+    if mensaje:
+        print(mensaje)
 
     if not res.ok:
-        advertencia = res.message or "n8n no devolvió mensaje; se generó un reporte vacío."
+        advertencia = res.mensaje or "n8n no devolvió mensaje; se generó un reporte vacío."
         print(f"Advertencia: {advertencia}")
+
 
 def generar_consulta_personalizada_local(session_id: str) -> None:
     consulta = input("Ingrese su consulta personalizada: ").strip()
     if not consulta:
         print("La consulta no puede estar vacía.")
         return
-    req = N8nRequest(
-        chat_input = consulta,
-        session_id = session_id,
-        intent = "consulta_personalizada",
+    req = SolicitudN8n(
+        entrada_chat = consulta,
+        id_sesion = session_id,
+        intencion = "consulta_personalizada",
     )
-    res = send_query(req)
-    registros = normalizar_registros_respuesta(res.data)
+    res = enviar_consulta(req)
+    registros = normalizar_registros_respuesta(res.datos)
+    mensaje = obtener_mensaje_desde_data(res.datos)
 
     formato_local, directorio_local = obtener_configuracion_local()
     path = exportar_reporte_local(registros, "reporte_consulta_personalizada", formato_local, directorio_local)
@@ -269,10 +350,13 @@ def generar_consulta_personalizada_local(session_id: str) -> None:
         mostrar_resultado_reporte(path, destino="local")
         if not registros:
             print("Nota: el reporte no contiene registros. Revisa el archivo para más detalles.")
+    if mensaje:
+        print(mensaje)
 
     if not res.ok:
-        advertencia = res.message or "n8n no devolvió mensaje; se generó un reporte vacío."
+        advertencia = res.mensaje or "n8n no devolvió mensaje; se generó un reporte vacío."
         print(f"Advertencia: {advertencia}")
+
 
 def manejar_menu_compartir(session_id: str) -> bool:
     while True:
@@ -319,20 +403,21 @@ def manejar_menu_compartir(session_id: str) -> bool:
         correo = solicitar_email_destino()
         parametros["destinatario"] = correo
 
-        chat_input = (
+        entrada_chat = (
             parametros.get("consulta")
             if tipo == "personalizado"
             else f"Compartir {descripcion} mediante {plataforma}"
         )
 
         enviar_reporte_compartir(
-            session_id = session_id,
-            chat_input = chat_input if chat_input else f"Compartir {descripcion} mediante {plataforma}",
+            id_sesion = session_id,
+            entrada_chat = chat_input if chat_input else f"Compartir {descripcion} mediante {plataforma}",
             descripcion = descripcion,
             tipo = tipo,
             plataforma = plataforma,
             params_extra = parametros,
         )
+
 
 def manejar_menu_local(session_id: str) -> bool:
     while True:
@@ -352,37 +437,59 @@ def manejar_menu_local(session_id: str) -> bool:
         else:
             print("Opción inválida. Por favor, intente de nuevo.")
 
+
 def consulta_personalizada_directa(session_id: str) -> None:
+    """Consulta personalizada que muestra resultados directamente en consola"""
     consulta = input("Ingrese su consulta en lenguaje natural: ").strip()
     if not consulta:
         print("La consulta no puede estar vacía.")
         return
-    req = N8nRequest(
-        chat_input = consulta,
-        session_id = session_id,
-        intent = "consulta_personalizada",
+    
+    req = SolicitudN8n(
+        entrada_chat = consulta,
+        id_sesion = session_id,
+        intencion = "consulta_personalizada",
     )
-    res = send_query(req)
-    if res.ok:
-        if res.message:
-            print(res.message)
-        if res.data:
-            if isinstance(res.data, dict):
-                url = res.data.get("url") or res.data.get("link")
-                if url:
-                    print(f"Acceso directo: {url}")
-                descripcion = res.data.get("descripcion")
-                if descripcion:
-                    print(descripcion)
-            else:
-                print(res.data)
-        elif not res.message:
-            print("La consulta fue procesada correctamente, pero no se recibieron datos adicionales.")
-    else:
-        print(f"Error al procesar la consulta: {res.message}")
+    res = enviar_consulta(req)
+    
+    # Extraer mensaje y datos usando la función mejorada
+    mensaje, datos = extraer_mensaje_y_datos(res)
+    
+    # Mostrar el mensaje si existe
+    if mensaje:
+        print(mensaje)
+    
+    """# Mostrar los datos, comentado para nuevas implementaciones.
+    if datos:
+        if isinstance(datos, dict):
+            # Mostrar los datos del diccionario
+            for clave, valor in datos.items():
+                # Filtrar campos internos que no son para el usuario
+                if clave not in ['accion', 'query_sql', 'mensaje_ia', 'mensaje', 'message']:
+                    print(f"{clave}: {valor}")
+        elif isinstance(datos, list):
+            # Mostrar lista de registros
+            for idx, registro in enumerate(datos, 1):
+                print(f"\n--- Registro {idx} ---")
+                if isinstance(registro, dict):
+                    for clave, valor in registro.items():
+                        print(f"{clave}: {valor}")
+                else:
+                    print(registro)
+        else:
+            print(datos)
+            """
+    
+    # Solo mostrar error si NO hay mensaje y NO hay datos
+    if not mensaje and not datos:
+        if not res.ok:
+            print(f"Error al procesar la consulta: {res.mensaje or 'Error desconocido'}")
+        else:
+            print("La consulta fue procesada correctamente, pero no se recibieron datos.")
+
 
 def main():
-    session_id = new_session_id()
+    id_sesion = nuevo_id_sesion()
     # print(f"(Sesión: {session_id})")
     while True:
         menu_principal()
@@ -402,6 +509,7 @@ def main():
             break
         else:
             print("Opción inválida. Por favor, intente de nuevo.")
+
 
 if __name__ == "__main__":
     main()
