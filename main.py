@@ -2,7 +2,16 @@ import json
 import re
 from n8n_client import enviar_consulta, nuevo_id_sesion
 from data_models import SolicitudN8n
-from report_generator import generar_reporte, solicitar_configuracion_salida 
+from report_generator import generar_reporte, solicitar_configuracion_salida
+from error_handler import (
+    validar_respuesta_n8n,
+    mostrar_mensaje_si_existe,
+    obtener_mensaje_desde_data,
+    normalizar_registros_respuesta,
+    MSG_SIN_ENVIOS_FALLIDOS,
+    MSG_SIN_DATOS_FILTRO,
+    MSG_SIN_DATOS_CONSULTA,
+) 
 
 
 APP_TITLE = "Bienvenido a Piki. Tu envío, sin estrés." 
@@ -10,6 +19,13 @@ APP_TITLE = "Bienvenido a Piki. Tu envío, sin estrés."
 
 def validar_codigo_envio(codigo: str) -> bool: 
     return bool(re.fullmatch(r'[A-Z0-9]{1,20}', codigo.strip(), flags=re.I)) 
+
+
+def formatear_datos(datos):
+    """Filtra valores None/null/vacíos de un diccionario para mostrar solo información relevante"""
+    if not isinstance(datos, dict):
+        return datos
+    return {k: v for k, v in datos.items() if v is not None and v != "null" and v != ""}
 
 
 def menu_principal():
@@ -57,13 +73,7 @@ def mostrar_resultado_reporte(path: str, destino: str = "") -> None:
         print(f"Reporte generado exitosamente: {path}")
 
 
-def obtener_mensaje_desde_data(data) -> str | None:
-    """Extrae el mensaje de la IA desde diferentes estructuras de datos"""
-    if isinstance(data, dict):
-        return data.get("mensaje_ia") or data.get("mensaje") or data.get("message")
-    if isinstance(data, list) and data and isinstance(data[0], dict):
-        return data[0].get("mensaje_ia") or data[0].get("mensaje") or data[0].get("message")
-    return None
+
 
 
 def extraer_mensaje_y_datos(res):
@@ -115,20 +125,7 @@ def obtener_configuracion_local() -> tuple[str, str]:
     return solicitar_configuracion_salida()
 
 
-def normalizar_registros_respuesta(datos):
-    """Normaliza diferentes formatos de respuesta a una lista de registros"""
-    if datos is None:
-        return []
-    if isinstance(datos, list):
-        return datos
-    if isinstance(datos, dict):
-        # Si tiene un campo 'data' interno que es lista, úsalo
-        interno = datos.get("data")
-        if isinstance(interno, list):
-            return interno
-        # Si no, devuelve el dict como único registro
-        return [datos]
-    return [datos]
+
 
 
 def exportar_reporte_local(data, nombre_base: str, formato: str, directorio: str) -> str | None:
@@ -209,7 +206,7 @@ def enviar_reporte_compartir(session_id: str, chat_input: str, descripcion: str,
         "plataforma": plataforma,
     }
     if params_extra:
-        params.update({k: v for k, v in params_extra.items() if v is not None})
+        parametros.update({k: v for k, v in params_extra.items() if v is not None})
 
     req = SolicitudN8n(
         entrada_chat = chat_input,
@@ -257,7 +254,8 @@ def consultar_estado_envio(session_id: str) -> None:
         print(mensaje)
     if datos:
         if isinstance(datos, dict):
-            for clave, valor in datos.items():
+            datos_limpios = formatear_datos(datos)
+            for clave, valor in datos_limpios.items():
                 print(f"{clave}: {valor}")
         else:
             print(datos)
@@ -276,9 +274,13 @@ def generar_reporte_envios_fallidos(session_id: str, destino: str) -> None:
     ) 
 
     res = enviar_consulta(req)
-    registros = normalizar_registros_respuesta(res.datos)
-    mensaje = obtener_mensaje_desde_data(res.datos)
+    
+    # Validar respuesta usando el helper centralizado
+    valido, registros, mensaje = validar_respuesta_n8n(res, MSG_SIN_ENVIOS_FALLIDOS)
+    if not valido:
+        return
 
+    # Solo solicitar formato si hay datos para exportar
     if destino == "local":
         formato_local, directorio_local = obtener_configuracion_local()
         path = exportar_reporte_local(registros, "reporte_envios_fallidos", formato_local, directorio_local)
@@ -287,14 +289,7 @@ def generar_reporte_envios_fallidos(session_id: str, destino: str) -> None:
 
     if path:
         mostrar_resultado_reporte(path, destino)
-        if not registros:
-            print("Nota: el reporte no contiene registros. Revisa el archivo para más detalles.")
-    if mensaje:
-        print(mensaje)
-
-    if not res.ok:
-        advertencia = res.mensaje or "n8n no devolvió mensaje; se generó un reporte vacío."
-        print(f"Advertencia: {advertencia}")
+    mostrar_mensaje_si_existe(mensaje)
 
 
 def generar_reporte_repartidores(session_id: str, destino: str) -> None:
@@ -309,9 +304,13 @@ def generar_reporte_repartidores(session_id: str, destino: str) -> None:
     )
 
     res = enviar_consulta(req)
-    registros = normalizar_registros_respuesta(res.datos)
-    mensaje = obtener_mensaje_desde_data(res.datos)
+    
+    # Validar respuesta usando el helper centralizado
+    valido, registros, mensaje = validar_respuesta_n8n(res, MSG_SIN_DATOS_FILTRO)
+    if not valido:
+        return
 
+    # Solo solicitar formato si hay datos para exportar
     if destino == "local":
         formato_local, directorio_local = obtener_configuracion_local()
         path = exportar_reporte_local(registros, "reporte_localidad_repartidor", formato_local, directorio_local)
@@ -320,14 +319,7 @@ def generar_reporte_repartidores(session_id: str, destino: str) -> None:
 
     if path:
         mostrar_resultado_reporte(path, destino)
-        if not registros:
-            print("Nota: el reporte no contiene registros. Revisa el archivo para más detalles.")
-    if mensaje:
-        print(mensaje)
-
-    if not res.ok:
-        advertencia = res.mensaje or "n8n no devolvió mensaje; se generó un reporte vacío."
-        print(f"Advertencia: {advertencia}")
+    mostrar_mensaje_si_existe(mensaje)
 
 
 def generar_consulta_personalizada_local(session_id: str) -> None:
@@ -341,21 +333,18 @@ def generar_consulta_personalizada_local(session_id: str) -> None:
         intencion = "consulta_personalizada",
     )
     res = enviar_consulta(req)
-    registros = normalizar_registros_respuesta(res.datos)
-    mensaje = obtener_mensaje_desde_data(res.datos)
+    
+    # Validar respuesta usando el helper centralizado
+    valido, registros, mensaje = validar_respuesta_n8n(res, MSG_SIN_DATOS_CONSULTA)
+    if not valido:
+        return
 
+    # Solo solicitar formato si hay datos para exportar
     formato_local, directorio_local = obtener_configuracion_local()
     path = exportar_reporte_local(registros, "reporte_consulta_personalizada", formato_local, directorio_local)
     if path:
         mostrar_resultado_reporte(path, destino="local")
-        if not registros:
-            print("Nota: el reporte no contiene registros. Revisa el archivo para más detalles.")
-    if mensaje:
-        print(mensaje)
-
-    if not res.ok:
-        advertencia = res.mensaje or "n8n no devolvió mensaje; se generó un reporte vacío."
-        print(f"Advertencia: {advertencia}")
+    mostrar_mensaje_si_existe(mensaje)
 
 
 def manejar_menu_compartir(session_id: str) -> bool:
@@ -411,7 +400,7 @@ def manejar_menu_compartir(session_id: str) -> bool:
 
         enviar_reporte_compartir(
             id_sesion = session_id,
-            entrada_chat = chat_input if chat_input else f"Compartir {descripcion} mediante {plataforma}",
+            entrada_chat = entrada_chat,
             descripcion = descripcion,
             tipo = tipo,
             plataforma = plataforma,
@@ -490,19 +479,19 @@ def consulta_personalizada_directa(session_id: str) -> None:
 
 def main():
     id_sesion = nuevo_id_sesion()
-    # print(f"(Sesión: {session_id})")
+    # print(f"(Sesión: {id_sesion})")
     while True:
         menu_principal()
         opcion = input("Seleccione una opción: ").strip().lower()
         if opcion == "1":
-            consultar_estado_envio(session_id)
+            consultar_estado_envio(id_sesion)
         elif opcion == "2":
-            if not manejar_menu_compartir(session_id):
+            if not manejar_menu_compartir(id_sesion):
                 break
         elif opcion == "3":
-            consulta_personalizada_directa(session_id)
+            consulta_personalizada_directa(id_sesion)
         elif opcion == "4":
-            if not manejar_menu_local(session_id):
+            if not manejar_menu_local(id_sesion):
                 break
         elif opcion == "0":
             print("Saliendo del programa. Hasta luego!")
