@@ -1,13 +1,13 @@
-class N8nRequest:
-    def __init__(self, chat_input, session_id, intent = None, params = None):
-        self.chat_input = chat_input
-        self.session_id = session_id
-        self.intent = intent
-        self.params = params if params is not None else {}
+class SolicitudN8n:
+    def __init__(self, entrada_chat, id_sesion, intencion = None, parametros = None):
+        self.entrada_chat = entrada_chat
+        self.id_sesion = id_sesion
+        self.intencion = intencion
+        self.parametros = parametros if parametros is not None else {}
 
-class N8nResponse: 
-    def __init__(self, ok, message = None, data = None, error = None):
+class RespuestaN8n: 
+    def __init__(self, ok, mensaje = None, datos = None, error = None):
         self.ok = ok
-        self.message = message
-        self.data = data
+        self.mensaje = mensaje
+        self.datos = datos
         self.error = error
