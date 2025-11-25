@@ -11,24 +11,78 @@ from error_handler import (
     MSG_SIN_ENVIOS_FALLIDOS,
     MSG_SIN_DATOS_FILTRO,
     MSG_SIN_DATOS_CONSULTA,
-) 
+)
 
 
-APP_TITLE = "Bienvenido a Piki. Tu envío, sin estrés." 
+# ============================================================================
+# CONSTANTES
+# ============================================================================
+
+APP_TITLE = "Bienvenido a Piki. Tu envío, sin estrés."
 
 
-def validar_codigo_envio(codigo: str) -> bool: 
+# ============================================================================
+# FUNCIONES DE VALIDACIÓN
+# ============================================================================
+ 
+
+
+def validar_codigo_envio(codigo: str) -> bool:
+    """
+    Valida el formato de un código de envío.
+    
+    El código debe contener solo caracteres alfanuméricos (A-Z, 0-9)
+    con una longitud entre 1 y 20 caracteres.
+    
+    Args:
+        codigo (str): Código de envío a validar
+    
+    Returns:
+        bool: True si el código es válido, False en caso contrario
+    
+    Ejemplos:
+        >>> validar_codigo_envio("ABC123")
+        True
+        >>> validar_codigo_envio("ABC-123")
+        False
+    """
     return bool(re.fullmatch(r'[A-Z0-9]{1,20}', codigo.strip(), flags=re.I)) 
 
 
 def formatear_datos(datos):
-    """Filtra valores None/null/vacíos de un diccionario para mostrar solo información relevante"""
+    """
+    Filtra valores None/null/vacíos de un diccionario.
+    
+    Remueve todas las entradas con valores None, "null" (string) o cadenas vacías,
+    dejando solo información relevante para mostrar al usuario.
+    
+    Args:
+        datos: Diccionario con datos a formatear (o cualquier otro tipo)
+    
+    Returns:
+        dict: Diccionario filtrado sin valores nulos/vacíos, o los datos originales
+              si no es un diccionario
+    """
     if not isinstance(datos, dict):
         return datos
     return {k: v for k, v in datos.items() if v is not None and v != "null" and v != ""}
 
 
+# ============================================================================
+# FUNCIONES DE MENÚS
+# ============================================================================
+
 def menu_principal():
+    """
+    Muestra el menú principal de la aplicación.
+    
+    Opciones disponibles:
+    - Consultar estado de un envío
+    - Generar reporte para compartir
+    - Consulta personalizada
+    - Generar reporte local
+    - Salir
+    """
     print(f"=== {APP_TITLE} ===") 
     print("[1] Consultar estado de un envío") 
     print("[2] Generar reporte para compartir")
@@ -38,8 +92,14 @@ def menu_principal():
 
 
 def menu_compartir():
-    print(f"=== {APP_TITLE} ===") 
-    print("[1] Compartir reporte de envíos fallidos") 
+    """
+    Muestra el menú de opciones para compartir reportes.
+    
+    Permite seleccionar qué tipo de reporte compartir en plataformas
+    como Drive, Gmail o Sheets.
+    """
+    print(f"=== {APP_TITLE} ===")
+    print("[1] Compartir reporte de envíos fallidos")
     print("[2] Compartir reporte de repartidores")
     print("[3] Consulta personalizada")
     print("[4] Volver al menú principal")
@@ -47,8 +107,14 @@ def menu_compartir():
 
 
 def menu_local():
-    print(f"=== {APP_TITLE} ===") 
-    print("[1] Descargar el reporte de envíos fallidos") 
+    """
+    Muestra el menú de opciones para generar reportes locales.
+    
+    Permite seleccionar qué tipo de reporte descargar localmente
+    en formato Excel o CSV.
+    """
+    print(f"=== {APP_TITLE} ===")
+    print("[1] Descargar el reporte de envíos fallidos")
     print("[2] Descargar el reporte de repartidores")
     print("[3] Consulta personalizada")
     print("[4] Volver al menú principal")
@@ -56,6 +122,14 @@ def menu_local():
 
 
 def menu_plataforma_compartir():
+    """
+    Muestra el menú de selección de plataforma para compartir.
+    
+    Plataformas disponibles:
+    - Google Drive
+    - Gmail
+    - Google Sheets
+    """
     print("=== Seleccione la plataforma para compartir ===")
     print("[1] Drive")
     print("[2] Gmail")
@@ -65,6 +139,15 @@ def menu_plataforma_compartir():
 
 
 def mostrar_resultado_reporte(path: str, destino: str = "") -> None:
+    """
+    Muestra un mensaje con la ruta del reporte generado.
+    
+    El mensaje varía según el tipo de destino (compartir, local, o genérico).
+    
+    Args:
+        path (str): Ruta del archivo generado
+        destino (str, optional): Tipo de destino ("compartir", "local", o vacío)
+    """
     if destino == "compartir":
         print(f"Reporte generado y listo para compartir en plataforma: {path}")
     elif destino == "local":
@@ -74,10 +157,40 @@ def mostrar_resultado_reporte(path: str, destino: str = "") -> None:
 
 
 
-
+# ============================================================================
+# FUNCIONES DE PROCESAMIENTO DE DATOS
+# ============================================================================
 
 def extraer_mensaje_y_datos(res):
-    """Extrae mensaje y datos de la respuesta de n8n, manejando diferentes formatos"""
+    """
+    Extrae mensaje y datos de la respuesta de n8n, manejando diferentes formatos.
+    
+    Esta función es crítica para normalizar las respuestas de n8n, que pueden
+    venir en múltiples formatos (string JSON, dict, dict anidado, etc.).
+    
+    Args:
+        res (RespuestaN8n): Objeto con la respuesta de n8n
+    
+    Returns:
+        tuple[str | None, any]: Tupla con (mensaje_extraido, datos_procesados)
+    
+    Casos manejados:
+        - res.datos como string JSON:
+            * Parsea el JSON
+            * Extrae mensaje de: mensaje_ia, mensaje, message
+            * Extrae datos de: data, datos, o el objeto completo
+        
+        - res.datos como dict:
+            * Busca campos anidados (mensaje_ia, data, etc.)
+            * Prioriza campos específicos sobre el objeto completo
+        
+        - Cualquier otro tipo:
+            * Mantiene mensaje original de res.mensaje
+            * Mantiene datos originales de res.datos
+    
+    Nota: Esta función es esencial para mantener compatibilidad con
+          las diferentes versiones y configuraciones de n8n.
+    """
     mensaje = res.mensaje
     datos = res.datos
     
@@ -121,14 +234,41 @@ def extraer_mensaje_y_datos(res):
     return mensaje, datos
 
 
+# ============================================================================
+# FUNCIONES DE CONFIGURACIÓN Y EXPORTACIÓN
+# ============================================================================
+
 def obtener_configuracion_local() -> tuple[str, str]:
+    """
+    Solicita al usuario la configuración para exportación local de reportes.
+    
+    Delega la solicitud a la función del módulo report_generator que
+    pide al usuario el formato (Excel/CSV) y directorio de destino.
+    
+    Returns:
+        tuple[str, str]: Tupla con (formato, directorio)
+            - formato: "xlsx" o "csv"
+            - directorio: Ruta donde guardar el archivo
+    """
     return solicitar_configuracion_salida()
 
 
 
-
-
 def exportar_reporte_local(data, nombre_base: str, formato: str, directorio: str) -> str | None:
+    """
+    Genera un reporte local (Excel o CSV) con los datos proporcionados.
+    
+    Maneja errores de generación y muestra mensajes apropiados.
+    
+    Args:
+        data: Datos a incluir en el reporte (lista de diccionarios)
+        nombre_base (str): Nombre base del archivo (sin extensión)
+        formato (str): Formato del archivo ("xlsx" o "csv")
+        directorio (str): Directorio donde guardar el archivo
+    
+    Returns:
+        str | None: Ruta completa del archivo generado, o None si hay error
+    """
     try:
         return generar_reporte(
             data = data,
@@ -142,7 +282,19 @@ def exportar_reporte_local(data, nombre_base: str, formato: str, directorio: str
         return None
 
 
+# ============================================================================
+# FUNCIONES DE ENTRADA DE USUARIO
+# ============================================================================
+
 def seleccionar_plataforma_compartir() -> str:
+    """
+    Solicita al usuario que seleccione una plataforma para compartir reportes.
+    
+    Muestra un menú interactivo y valida la selección.
+    
+    Returns:
+        str: Plataforma seleccionada ("drive", "gmail", "sheets", "volver", o "salir")
+    """
     while True:
         menu_plataforma_compartir()
         opcion = input("Seleccione una plataforma: ").strip().lower()
@@ -158,8 +310,17 @@ def seleccionar_plataforma_compartir() -> str:
             return "salir"
         print("Opción inválida. Intente nuevamente.")
 
-
+#Verificar bien la varible correo --> mail
 def solicitar_email_destino() -> str:
+    """
+    Solicita y valida un correo electrónico de destino.
+    
+    Utiliza expresión regular para validar el formato del email.
+    Continúa solicitando hasta recibir un email válido.
+    
+    Returns:
+        str: Correo electrónico validado
+    """
     patron = r'^[\w\.-]+@[\w\.-]+\.[a-zA-Z]{2,}$'
     while True:
         correo = input("Ingrese el correo electrónico para la notificación: ").strip()
@@ -167,8 +328,20 @@ def solicitar_email_destino() -> str:
             return correo
         print("Correo inválido. Intente nuevamente.")
 
-
+#verificar bien la varible se puede imprimir directo lo que responde la ia
 def solicitar_filtros_reparto():
+    """
+    Solicita al usuario los filtros para generar reporte de repartidores.
+    
+    Permite filtrar por:
+    - Solo localidad
+    - Solo repartidor  
+    - Ambos criterios
+    
+    Returns:
+        dict | None: Diccionario con filtros {"localidad": str | None, "repartidor": str | None}.
+                     Retorna None si el usuario cancela.
+    """
     while True:
         print("=== Seleccione el criterio para el reporte de repartidores ===")
         print("[1] Filtrar por localidad")
@@ -200,7 +373,25 @@ def solicitar_filtros_reparto():
         print("Opción inválida. Intente nuevamente.")
 
 
+# ============================================================================
+# FUNCIONES DE REPORTES Y CONSULTAS
+# ============================================================================
+
 def enviar_reporte_compartir(session_id: str, chat_input: str, descripcion: str, tipo: str, plataforma: str, params_extra = None) -> None:
+    """
+    Envía un reporte a n8n para ser compartido en una plataforma externa.
+    
+    Esta función prepara los parámetros, envía la solicitud a n8n y procesa
+    la respuesta para mostrar mensajes y enlaces al usuario.
+    
+    Args:
+        session_id (str): ID de la sesión actual
+        chat_input (str): Mensaje de entrada para n8n
+        descripcion (str): Descripción del reporte para mensajes al usuario
+        tipo (str): Tipo de reporte ("fallidos", "repartidores", "personalizado")
+        plataforma (str): Plataforma destino ("drive", "gmail", "sheets")
+        params_extra (dict, optional): Parámetros adicionales (filtros, destinatario, etc.)
+    """
     parametros = {
         "tipo": tipo,
         "plataforma": plataforma,
@@ -212,14 +403,14 @@ def enviar_reporte_compartir(session_id: str, chat_input: str, descripcion: str,
         entrada_chat = chat_input,
         id_sesion = session_id,
         intencion = f"compartir_{tipo}",
-        parametros = params,
+        parametros = parametros,
     )
     res = enviar_consulta(req)
     if res.ok:
         mensaje = obtener_mensaje_desde_data(res.datos) or res.mensaje
         if mensaje:
             print(mensaje)
-        if res.datos:
+        if res.datos: #Anda a chequearlo bien
             if isinstance(res.datos, dict):
                 url = res.datos.get("url") or res.datos.get("link")
                 if url:
@@ -236,6 +427,15 @@ def enviar_reporte_compartir(session_id: str, chat_input: str, descripcion: str,
 
 
 def consultar_estado_envio(session_id: str) -> None:
+    """
+    Consulta y muestra el estado de un envío específico.
+    
+    Solicita al usuario el código de envío, lo valida, consulta a n8n
+    y muestra la información del estado del envío formateada.
+    
+    Args:
+        session_id (str): ID de la sesión actual
+    """
     codigo = input("Ingrese el código de envío: ").strip()
     if not validar_codigo_envio(codigo):
         print("Código de envío inválido. Debe contener entre 1 y 20 caracteres alfanuméricos.")
@@ -267,6 +467,16 @@ def consultar_estado_envio(session_id: str) -> None:
 
 
 def generar_reporte_envios_fallidos(session_id: str, destino: str) -> None:
+    """
+    Genera un reporte de todos los envíos con estado fallido.
+    
+    Consulta a n8n los envíos fallidos y genera un reporte en Excel/CSV
+    según el destino especificado (local o para compartir).
+    
+    Args:
+        session_id (str): ID de la sesión actual
+        destino (str): Destino del reporte ("local" para descarga, otro para compartir)
+    """
     req = SolicitudN8n(
         entrada_chat = "Generar reporte de envíos fallidos",
         id_sesion = session_id,
@@ -293,6 +503,16 @@ def generar_reporte_envios_fallidos(session_id: str, destino: str) -> None:
 
 
 def generar_reporte_repartidores(session_id: str, destino: str) -> None:
+    """
+    Genera un reporte filtrado por repartidor y/o localidad.
+    
+    Solicita al usuario los criterios de filtrado (localidad, repartidor, o ambos),
+    consulta a n8n y genera un reporte en Excel/CSV.
+    
+    Args:
+        session_id (str): ID de la sesión actual
+        destino (str): Destino del reporte ("local" para descarga, otro para compartir)
+    """
     filtros = solicitar_filtros_reparto()
     if not filtros:
         return
@@ -323,6 +543,15 @@ def generar_reporte_repartidores(session_id: str, destino: str) -> None:
 
 
 def generar_consulta_personalizada_local(session_id: str) -> None:
+    """
+    Genera un reporte local basado en una consulta personalizada del usuario.
+    
+    Permite al usuario ingresar una consulta en lenguaje natural, la envía a n8n
+    para procesamiento y genera un reporte local con los resultados.
+    
+    Args:
+        session_id (str): ID de la sesión actual
+    """
     consulta = input("Ingrese su consulta personalizada: ").strip()
     if not consulta:
         print("La consulta no puede estar vacía.")
@@ -347,7 +576,23 @@ def generar_consulta_personalizada_local(session_id: str) -> None:
     mostrar_mensaje_si_existe(mensaje)
 
 
+# ============================================================================
+# FUNCIONES DE MANEJO DE MENÚS (HANDLERS)
+# ============================================================================
+
 def manejar_menu_compartir(session_id: str) -> bool:
+    """
+    Maneja la lógica del submenú de compartir reportes.
+    
+    Muestra el menú, procesa la selección del usuario, solicita plataforma
+    y correo de destino, y envía el reporte a n8n para ser compartido.
+    
+    Args:
+        session_id (str): ID de la sesión actual
+    
+    Returns:
+        bool: True si debe volver al menú principal, False si debe salir del programa
+    """
     while True:
         menu_compartir()
         opcion = input("Seleccione una opción: ").strip().lower()
@@ -409,6 +654,18 @@ def manejar_menu_compartir(session_id: str) -> bool:
 
 
 def manejar_menu_local(session_id: str) -> bool:
+    """
+    Maneja la lógica del submenú de reportes locales.
+    
+    Muestra el menú, procesa la selección del usuario y genera reportes
+    locales en formato Excel o CSV.
+    
+    Args:
+        session_id (str): ID de la sesión actual
+    
+    Returns:
+        bool: True si debe volver al menú principal, False si debe salir del programa
+    """
     while True:
         menu_local()
         opcion = input("Seleccione una opción: ").strip().lower()
@@ -428,7 +685,19 @@ def manejar_menu_local(session_id: str) -> bool:
 
 
 def consulta_personalizada_directa(session_id: str) -> None:
-    """Consulta personalizada que muestra resultados directamente en consola"""
+    """
+    Procesa una consulta personalizada y muestra resultados directamente en consola.
+    
+    Permite al usuario ingresar consultas en lenguaje natural. El agente de IA
+    procesa la consulta y retorna una respuesta que se muestra directamente,
+    sin generar archivos de reporte.
+    
+    Nota: Como trabaja con sesión, el usuario puede hacer consultas de seguimiento
+          sobre los datos de consultas anteriores (ej: "cuál es el porcentaje total?").
+    
+    Args:
+        session_id (str): ID de la sesión actual
+    """
     consulta = input("Ingrese su consulta en lenguaje natural: ").strip()
     if not consulta:
         print("La consulta no puede estar vacía.")
@@ -469,6 +738,9 @@ def consulta_personalizada_directa(session_id: str) -> None:
             print(datos)
             """
     
+    #otra consulta personalizada, por si quiere hacer mas consultas sobre esa consulta anterior, 
+    #Al estar en una sesion, se puede volver a llamar a la sesion en la que estabas haciendo las peticiones, y trabajar con esos datos recibidos, por ejemplo: entonces, cual seria el porcentaje total de envios fallido?
+
     # Solo mostrar error si NO hay mensaje y NO hay datos
     if not mensaje and not datos:
         if not res.ok:
@@ -477,7 +749,28 @@ def consulta_personalizada_directa(session_id: str) -> None:
             print("La consulta fue procesada correctamente, pero no se recibieron datos.")
 
 
+# ============================================================================
+# FUNCIÓN PRINCIPAL
+# ============================================================================
+
 def main():
+    """
+    Función principal que inicia la aplicación.
+    
+    Genera un ID de sesión único, muestra el menú principal en un bucle
+    y delega las acciones según la opción seleccionada por el usuario.
+    
+    Flujo:
+        1. Genera ID de sesión
+        2. Muestra menú principal
+        3. Procesa selección del usuario:
+           - Opción 1: Consultar estado de envío
+           - Opción 2: Menú de compartir reportes
+           - Opción 3: Consulta personalizada directa
+           - Opción 4: Menú de reportes locales
+           - Opción 0: Salir
+        4. Repite hasta que el usuario elija salir
+    """
     id_sesion = nuevo_id_sesion()
     # print(f"(Sesión: {id_sesion})")
     while True:
