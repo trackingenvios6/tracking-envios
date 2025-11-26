@@ -96,7 +96,7 @@ def menu_compartir():
     Muestra el menú de opciones para compartir reportes.
     
     Permite seleccionar qué tipo de reporte compartir en plataformas
-    como Drive, Gmail o Sheets.
+    como Drive, Gmail o Consulta personalizada.
     """
     print(f"=== {APP_TITLE} ===")
     print("[1] Compartir reporte de envíos fallidos")
@@ -121,6 +121,25 @@ def menu_local():
     print("[0] Salir")
 
 
+def menu_continuar():
+    """
+    Muestra el menú de continuación después de completar una acción.
+    
+    Permite al usuario elegir dónde navegar sin volver al inicio:
+    - Menú principal: Consultar envíos y acceder a todas las funciones
+    - Generar reporte para compartir: Enviar reportes por Drive o Gmail
+    - Generar reporte local: Descargar reportes en Excel/CSV
+    """
+    print("\n" + "="*60)
+    print("¿Qué deseas hacer ahora?")
+    print("="*60)
+    print("[1] Volver al menú principal - Consultar envíos y más opciones")
+    print("[2] Generar reporte para compartir - Enviar por Drive o Gmail")
+    print("[3] Generar reporte local - Descargar en tu computadora")
+    print("[0] Salir")
+    print("="*60)
+
+
 def menu_plataforma_compartir():
     """
     Muestra el menú de selección de plataforma para compartir.
@@ -128,13 +147,11 @@ def menu_plataforma_compartir():
     Plataformas disponibles:
     - Google Drive
     - Gmail
-    - Google Sheets
     """
     print("=== Seleccione la plataforma para compartir ===")
     print("[1] Drive")
     print("[2] Gmail")
-    print("[3] Sheets")
-    print("[4] Volver al menú anterior")
+    print("[3] Volver al menú anterior")
     print("[0] Salir")
 
 
@@ -293,7 +310,7 @@ def seleccionar_plataforma_compartir() -> str:
     Muestra un menú interactivo y valida la selección.
     
     Returns:
-        str: Plataforma seleccionada ("drive", "gmail", "sheets", "volver", o "salir")
+        str: Plataforma seleccionada ("drive", "gmail", "volver", o "salir")
     """
     while True:
         menu_plataforma_compartir()
@@ -303,8 +320,6 @@ def seleccionar_plataforma_compartir() -> str:
         if opcion == "2":
             return "gmail"
         if opcion == "3":
-            return "sheets"
-        if opcion == "4":
             return "volver"
         if opcion == "0":
             return "salir"
@@ -389,7 +404,7 @@ def enviar_reporte_compartir(session_id: str, chat_input: str, descripcion: str,
         chat_input (str): Mensaje de entrada para n8n
         descripcion (str): Descripción del reporte para mensajes al usuario
         tipo (str): Tipo de reporte ("fallidos", "repartidores", "personalizado")
-        plataforma (str): Plataforma destino ("drive", "gmail", "sheets")
+        plataforma (str): Plataforma destino ("drive", "gmail", "Consulta personalizada")
         params_extra (dict, optional): Parámetros adicionales (filtros, destinatario, etc.)
     """
     parametros = {
@@ -644,13 +659,15 @@ def manejar_menu_compartir(session_id: str) -> bool:
         )
 
         enviar_reporte_compartir(
-            id_sesion = session_id,
-            entrada_chat = entrada_chat,
+            session_id = session_id,
+            chat_input = entrada_chat,
             descripcion = descripcion,
             tipo = tipo,
             plataforma = plataforma,
             params_extra = parametros,
         )
+        # Retornar True después de completar la acción
+        return True
 
 
 def manejar_menu_local(session_id: str) -> bool:
@@ -671,10 +688,16 @@ def manejar_menu_local(session_id: str) -> bool:
         opcion = input("Seleccione una opción: ").strip().lower()
         if opcion == "1":
             generar_reporte_envios_fallidos(session_id, destino="local")
+            # Retornar True después de completar la acción
+            return True
         elif opcion == "2":
             generar_reporte_repartidores(session_id, destino="local")
+            # Retornar True después de completar la acción
+            return True
         elif opcion == "3":
             generar_consulta_personalizada_local(session_id)
+            # Retornar True después de completar la acción
+            return True
         elif opcion == "4":
             return True
         elif opcion == "0":
@@ -750,6 +773,36 @@ def consulta_personalizada_directa(session_id: str) -> None:
 
 
 # ============================================================================
+# FUNCIÓN DE NAVEGACIÓN
+# ============================================================================
+
+def manejar_continuar() -> str:
+    """
+    Maneja la navegación después de completar una acción.
+    
+    Muestra el menú de continuación y retorna el destino seleccionado
+    por el usuario para facilitar la navegación entre menús.
+    
+    Returns:
+        str: Destino seleccionado - "principal", "compartir", "local", o "salir"
+    """
+    while True:
+        menu_continuar()
+        opcion = input("\nSelecciona una opción: ").strip()
+        if opcion == "1":
+            return "principal"
+        elif opcion == "2":
+            return "compartir"
+        elif opcion == "3":
+            return "local"
+        elif opcion == "0":
+            print("Saliendo del programa. ¡Hasta luego! 👋")
+            return "salir"
+        else:
+            print("❌ Opción inválida. Por favor, intenta de nuevo.")
+
+
+# ============================================================================
 # FUNCIÓN PRINCIPAL
 # ============================================================================
 
@@ -762,35 +815,76 @@ def main():
     
     Flujo:
         1. Genera ID de sesión
-        2. Muestra menú principal
+        2. Muestra menú principal o el menú activo
         3. Procesa selección del usuario:
            - Opción 1: Consultar estado de envío
            - Opción 2: Menú de compartir reportes
            - Opción 3: Consulta personalizada directa
            - Opción 4: Menú de reportes locales
            - Opción 0: Salir
-        4. Repite hasta que el usuario elija salir
+        4. Después de cada acción, muestra menú de continuación
+        5. Repite hasta que el usuario elija salir
     """
     id_sesion = nuevo_id_sesion()
     # print(f"(Sesión: {id_sesion})")
+    
+    menu_activo = "principal"  # Controla qué menú mostrar
+    
     while True:
-        menu_principal()
-        opcion = input("Seleccione una opción: ").strip().lower()
-        if opcion == "1":
-            consultar_estado_envio(id_sesion)
-        elif opcion == "2":
-            if not manejar_menu_compartir(id_sesion):
+        # Mostrar el menú correspondiente
+        if menu_activo == "principal":
+            menu_principal()
+            opcion = input("Seleccione una opción: ").strip().lower()
+            
+            if opcion == "1":
+                consultar_estado_envio(id_sesion)
+                # Preguntar al usuario qué hacer después
+                destino = manejar_continuar()
+                if destino == "salir":
+                    break
+                menu_activo = destino
+                
+            elif opcion == "2":
+                menu_activo = "compartir"
+                
+            elif opcion == "3":
+                consulta_personalizada_directa(id_sesion)
+                # Preguntar al usuario qué hacer después
+                destino = manejar_continuar()
+                if destino == "salir":
+                    break
+                menu_activo = destino
+                
+            elif opcion == "4":
+                menu_activo = "local"
+                
+            elif opcion == "0":
+                print("Saliendo del programa. ¡Hasta luego! 👋")
                 break
-        elif opcion == "3":
-            consulta_personalizada_directa(id_sesion)
-        elif opcion == "4":
-            if not manejar_menu_local(id_sesion):
+            else:
+                print("❌ Opción inválida. Por favor, intente de nuevo.")
+        
+        elif menu_activo == "compartir":
+            continuar = manejar_menu_compartir(id_sesion)
+            if not continuar:
+                # El usuario salió desde el menú compartir
                 break
-        elif opcion == "0":
-            print("Saliendo del programa. Hasta luego!")
-            break
-        else:
-            print("Opción inválida. Por favor, intente de nuevo.")
+            # Preguntar al usuario qué hacer después
+            destino = manejar_continuar()
+            if destino == "salir":
+                break
+            menu_activo = destino
+        
+        elif menu_activo == "local":
+            continuar = manejar_menu_local(id_sesion)
+            if not continuar:
+                # El usuario salió desde el menú local
+                break
+            # Preguntar al usuario qué hacer después
+            destino = manejar_continuar()
+            if destino == "salir":
+                break
+            menu_activo = destino
 
 
 if __name__ == "__main__":
