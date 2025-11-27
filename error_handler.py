@@ -45,9 +45,9 @@ def obtener_mensaje_desde_data(data) -> str | None:
         str | None: Mensaje extraído o None si no se encuentra
     """
     if isinstance(data, dict):
-        return data.get("mensaje_ia") or data.get("mensaje") or data.get("message")
+        return data.get("mensaje_ia") 
     if isinstance(data, list) and data and isinstance(data[0], dict):
-        return data[0].get("mensaje_ia") or data[0].get("mensaje") or data[0].get("message")
+        return data[0].get("mensaje_ia") 
     return None # No se encontró mensaje
 
 def normalizar_registros_respuesta(datos):

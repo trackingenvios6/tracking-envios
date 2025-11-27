@@ -194,7 +194,7 @@ def extraer_mensaje_y_datos(res):
     Casos manejados:
         - res.datos como string JSON:
             * Parsea el JSON
-            * Extrae mensaje de: mensaje_ia, mensaje, message
+            * Extrae mensaje de: mensaje_ia
             * Extrae datos de: data, datos, o el objeto completo
         
         - res.datos como dict:
@@ -218,8 +218,6 @@ def extraer_mensaje_y_datos(res):
                 # Intenta extraer mensaje de múltiples campos posibles
                 mensaje = (
                     parsed.get("mensaje_ia") or 
-                    parsed.get("mensaje") or 
-                    parsed.get("message") or 
                     mensaje
                 )
                 # Extrae datos del campo 'data' si existe, sino usa todo el parsed
@@ -237,8 +235,6 @@ def extraer_mensaje_y_datos(res):
         # Manejo específico para la estructura de n8n
         mensaje = (
             res.datos.get("mensaje_ia") or 
-            res.datos.get("mensaje") or 
-            res.datos.get("message") or 
             mensaje
         )
         # Si hay un campo 'data' dentro, úsalo; sino usa res.datos directamente
@@ -649,8 +645,10 @@ def manejar_menu_compartir(session_id: str) -> bool:
             print("Saliendo del programa. Hasta luego!")
             return False
 
-        correo = solicitar_email_destino()
-        parametros["destinatario"] = correo
+        # Solo solicitar email si la plataforma es Gmail
+        if plataforma == "gmail":
+            correo = solicitar_email_destino()
+            parametros["email_destinatario"] = correo
 
         entrada_chat = (
             parametros.get("consulta")
@@ -746,7 +744,7 @@ def consulta_personalizada_directa(session_id: str) -> None:
             # Mostrar los datos del diccionario
             for clave, valor in datos.items():
                 # Filtrar campos internos que no son para el usuario
-                if clave not in ['accion', 'query_sql', 'mensaje_ia', 'mensaje', 'message']:
+                if clave not in ['accion', 'query_sql', 'mensaje_ia']:
                     print(f"{clave}: {valor}")
         elif isinstance(datos, list):
             # Mostrar lista de registros

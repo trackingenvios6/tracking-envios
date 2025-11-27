@@ -32,15 +32,14 @@ import os
 
 # URL del webhook de n8n (entorno → fallback local)
 
-N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "[http://localhost:5678/webhook-test/prueba](http://localhost:5678/webhook-test/prueba)")
+N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "http://localhost:5678/webhook/prueba")
 
 # API Key opcional para autenticación (string vacío si no está definida)
-
 API_KEY = os.getenv("API_KEY", "")
 
 # Timeout para solicitudes HTTP (convertido explícitamente a float)
 
-TIMEOUT = float(os.getenv("TIMEOUT", "500.0"))
+TIMEOUT = float(os.getenv("TIMEOUT", "120.0"))
 
 # Carpeta donde se almacenarán reportes generados
 
