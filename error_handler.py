@@ -8,6 +8,8 @@ Este módulo centraliza:
 """
 
 from data_models import RespuestaN8n
+from utils.helpers import obtener_mensaje_desde_data
+from utils.formateo import normalizar_registros_respuesta
 
 
 # ============================================================================
@@ -34,44 +36,8 @@ MSG_PROCESADO_CORRECTAMENTE = "n8n procesó la solicitud correctamente."
 # FUNCIONES DE UTILIDAD
 # ============================================================================
 
-def obtener_mensaje_desde_data(data) -> str | None:
-    """
-    Extrae el mensaje de la IA desde diferentes estructuras de datos.
-    
-    Args:
-        data: Datos de respuesta de n8n (puede ser dict, list, etc.)
-    
-    Returns:
-        str | None: Mensaje extraído o None si no se encuentra
-    """
-    if isinstance(data, dict):
-        return data.get("mensaje_ia") 
-    if isinstance(data, list) and data and isinstance(data[0], dict):
-        return data[0].get("mensaje_ia") 
-    return None # No se encontró mensaje
-
-def normalizar_registros_respuesta(datos):
-    """
-    Normaliza diferentes formatos de respuesta a una lista de registros.
-    
-    Args:
-        datos: Datos de respuesta de n8n
-    
-    Returns:
-        list: Lista de registros normalizada
-    """
-    if datos is None:
-        return []
-    if isinstance(datos, list):
-        return datos
-    if isinstance(datos, dict):
-        # Si tiene un campo 'data' interno que es lista, úsalo
-        interno = datos.get("data")
-        if isinstance(interno, list):
-            return interno
-        # Si no, devuelve el dict como único registro
-        return [datos]
-    return [datos]
+# obtener_mensaje_desde_data y normalizar_registros_respuesta están
+# implementadas en utils.helpers y utils.formateo.
 
 
 # ============================================================================
