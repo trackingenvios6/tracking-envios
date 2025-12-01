@@ -28,10 +28,20 @@ def consultar_estado_envio(session_id: str) -> None:
 	if mensaje:
 		print(mensaje)
 	if datos:
-		if isinstance(datos, dict):
+		if isinstance(datos, list) and len(datos) > 0:
+			# Si es una lista con elementos, tomar el primero
+			if isinstance(datos[0], dict):
+				datos_limpios = formatear_datos(datos[0])
+				for clave, valor in datos_limpios.items():
+					valor_mostrar = "No asignado" if valor is None else valor
+					print(f"{clave}: {valor_mostrar}")
+			else:
+				print(datos[0])
+		elif isinstance(datos, dict):
 			datos_limpios = formatear_datos(datos)
 			for clave, valor in datos_limpios.items():
-				print(f"{clave}: {valor}")
+				valor_mostrar = "No asignado" if valor is None else valor
+				print(f"{clave}: {valor_mostrar}")
 		else:
 			print(datos)
 	elif not mensaje:
@@ -69,7 +79,8 @@ def consulta_personalizada_directa(session_id: str) -> None:
 				print(f"\n--- Registro {idx} ---")
 				if isinstance(registro, dict):
 					for clave, valor in registro.items():
-						print(f"{clave}: {valor}")
+						valor_mostrar = "No asignado" if valor is None else valor
+						print(f"{clave}: {valor_mostrar}")
 				else:
 					print(registro)
 		elif isinstance(datos, dict):
@@ -95,7 +106,8 @@ def consulta_personalizada_directa(session_id: str) -> None:
 			}
 			for clave, valor in datos.items():
 				if clave not in campos_mostrados:
-					print(f"{clave}: {valor}")
+					valor_mostrar = "No asignado" if valor is None else valor
+					print(f"{clave}: {valor_mostrar}")
 		else:
 			# Cualquier otro tipo de dato
 			print(datos)

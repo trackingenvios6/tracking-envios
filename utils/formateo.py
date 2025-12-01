@@ -8,10 +8,11 @@ from typing import Any, Tuple
 
 
 def formatear_datos(datos: Any):
-	"""Filtra valores None/null/vacíos de un diccionario."""
+	"""Filtra valores 'null'/vacíos de un diccionario (pero mantiene None para mostrar como 'No asignado')."""
 	if not isinstance(datos, dict):
 		return datos
-	return {k: v for k, v in datos.items() if v is not None and v != "null" and v != ""}
+	# Solo filtramos strings "null" y strings vacíos, pero NO None
+	return {k: v for k, v in datos.items() if v != "null" and v != ""}
 
 
 def extraer_mensaje_y_datos(res) -> Tuple[str | None, Any]:
