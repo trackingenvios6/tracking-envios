@@ -40,7 +40,10 @@ def extraer_mensaje_y_datos(res) -> Tuple[str | None, Any]:
 			datos = res.datos.get("data")
 		elif "datos" in res.datos:
 			datos = res.datos.get("datos")
-
+		else:
+			# Si no hay campo data/datos, mantener el dict completo
+			datos = res.datos
+	
 	return mensaje, datos
 
 
