@@ -39,7 +39,12 @@ def spinner_procesando(mensaje: str):
 	Args:
 		mensaje: Texto a mostrar durante la carga
 	"""
-	spinner = Spinner("dots", text=f"⏳ {mensaje}", style=STYLES['procesando'])
+	# Crear texto con estilo
+	texto_spinner = Text()
+	texto_spinner.append("⏳ ", style="bold")
+	texto_spinner.append(mensaje, style=STYLES['procesando'])
+	
+	spinner = Spinner("dots", text=texto_spinner)
 	
 	with Live(spinner, console=console, refresh_per_second=10):
 		yield

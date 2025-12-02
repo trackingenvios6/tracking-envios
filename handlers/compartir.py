@@ -11,11 +11,12 @@ from ui.validaciones import (
 )
 from utils.helpers import obtener_mensaje_desde_data
 from ui.console_utils import (
-	print_procesando,
+	spinner_procesando,
 	print_mensaje_n8n,
 	print_url,
 	print_error,
-	print_exito
+	print_exito,
+	print_info
 )
 
 
@@ -28,15 +29,15 @@ def enviar_reporte_compartir(session_id: str, chat_input: str, descripcion: str,
 	if params_extra:
 		parametros.update({k: v for k, v in params_extra.items() if v is not None})
 
-	print_procesando(f"Generando {descripcion} para compartir, aguarde...")
-	
 	req = SolicitudN8n(
 		entrada_chat = chat_input,
 		id_sesion = session_id,
 		intencion = f"compartir_{tipo}",
 		parametros = parametros,
 	)
-	res = enviar_consulta(req)
+	
+	with spinner_procesando(f"Generando {descripcion} para compartir"):
+		res = enviar_consulta(req)
 	if res.ok:
 		mensaje = obtener_mensaje_desde_data(res.datos) or res.mensaje
 		if mensaje:

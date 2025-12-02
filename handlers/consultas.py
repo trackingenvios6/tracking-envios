@@ -84,14 +84,15 @@ def consulta_personalizada_directa(session_id: str) -> None:
 		print_info("Operación cancelada.")
 		return
 	
-	print_procesando("Procesando su consulta, aguarde...")
+
 	
 	req = SolicitudN8n(
 		entrada_chat = consulta,
 		id_sesion = session_id,
 		intencion = "consulta_personalizada",
 	)
-	res = enviar_consulta(req)
+	with spinner_procesando("Procesando su consulta"):
+		res = enviar_consulta(req)
 	
 	mensaje, datos = extraer_mensaje_y_datos(res)
 	
