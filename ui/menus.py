@@ -50,7 +50,7 @@ def menu_principal():
 	
 	table.add_row("🔍 [1]", "Consultar estado de un envío")
 	table.add_row("📤 [2]", "Generar reporte para compartir")
-	table.add_row("💬 [3]", "Consulta personalizada")
+	table.add_row("💬 [3]", "Iniciar chat con Piki")
 	table.add_row("💾 [4]", "Generar reporte local")
 	table.add_row("", "")  # Separador
 	table.add_row("👋 [0]", "[red]Salir[/red]")

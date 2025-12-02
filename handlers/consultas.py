@@ -147,3 +147,131 @@ def consulta_personalizada_directa(session_id: str) -> None:
 			print(f"Error al procesar la consulta: {res.mensaje or 'Error desconocido'}")
 		else:
 			print("La consulta fue procesada correctamente, pero no se recibieron datos.")
+
+
+def iniciar_chat_con_piki(session_id: str) -> None:
+	"""
+	Inicia un chat conversacional infinito con Piki.
+	
+	Mantiene el mismo session_id durante toda la conversación para que n8n Memory funcione.
+	El usuario puede escribir múltiples mensajes hasta que escriba 'salir', 'exit', 'chau' o presione Ctrl+C.
+	
+	Args:
+		session_id: ID de sesión único para mantener el contexto de la conversación
+	"""
+	from rich.console import Console
+	import os
+	
+	console = Console()
+	comandos_salida = {"salir", "exit", "chau"}
+	
+	# Mensaje de bienvenida
+	console.print("\n╔═══════════════════════════════════════════════════════════╗", style="bold cyan")
+	console.print("║          💬 Chat con Piki - Modo Conversacional           ║", style="bold cyan")
+	console.print("╚═══════════════════════════════════════════════════════════╝", style="bold cyan")
+	console.print("\nEscribe 'salir', 'exit' o 'chau' para volver al menú", style="dim italic")
+	console.print("Presiona Ctrl+C en cualquier momento para salir\n", style="dim italic")
+	print_separador("═", 60)
+	
+	try:
+		while True:
+			# Solicitar entrada del usuario
+			console.print("\n👤 Tú: ", style="bold yellow", end="")
+			try:
+				consulta = input().strip()
+			except EOFError:
+				# Si el usuario presiona Ctrl+D o Ctrl+Z
+				break
+			
+			# Verificar comandos de salida (case-insensitive)
+			if consulta.lower() in comandos_salida:
+				console.print("\n👋 Saliendo del chat...", style="bold cyan")
+				break
+			
+			# Ignorar mensajes vacíos
+			if not consulta:
+				console.print("⚠️  Por favor escribe algo o usa 'salir' para volver al menú", style="yellow")
+				continue
+			
+			# Crear solicitud y enviar a n8n
+			req = SolicitudN8n(
+				entrada_chat=consulta,
+				id_sesion=session_id,
+				intencion="consulta_personalizada",
+			)
+			
+			# Mostrar spinner mientras procesa
+			with spinner_procesando("Piki está pensando"):
+				res = enviar_consulta(req)
+			
+			# Extraer mensaje y datos de la respuesta
+			mensaje, datos = extraer_mensaje_y_datos(res)
+			
+			# Mostrar respuesta de Piki
+			print_separador("─", 60)
+			console.print("🤖 Piki: ", style="bold cyan", end="")
+			
+			# Mostrar el mensaje si existe
+			if mensaje:
+				console.print(mensaje, style="cyan")
+			
+			# Mostrar los datos si existen
+		if datos:
+			if isinstance(datos, list) and len(datos) > 0:
+				console.print()
+				for idx, registro in enumerate(datos, 1):
+					console.print(f"\n  📋 Registro {idx}", style="bold blue")
+					if isinstance(registro, dict):
+						for clave, valor in registro.items():
+							# Formatear manualmente para evitar None
+							if valor is None:
+								console.print(f"    {clave}: No asignado", style="dim yellow")
+							else:
+								console.print(f"    {clave}: {valor}")
+					else:
+						console.print(f"    {registro}")
+					if idx < len(datos):
+						print_separador("·", 40)
+			elif isinstance(datos, dict):
+				url = (datos.get("url") or 
+				       datos.get("link") or 
+				       datos.get("webViewLink") or 
+				       datos.get("webContentLink"))
+				if url:
+					print_url(url)
+				
+				descripcion_extra = datos.get("descripcion")
+				if descripcion_extra:
+					console.print(f"\n📝 {descripcion_extra}")
+				
+				campos_mostrados = {
+					'url', 'link', 'webViewLink', 'webContentLink', 
+					'descripcion', 'accion', 'query_sql', 
+					'mensaje_ia', 'mensaje', 'message'
+				}
+				for clave, valor in datos.items():
+					if clave not in campos_mostrados:
+						if valor is None:
+							console.print(f"{clave}: No asignado", style="dim yellow")
+						else:
+							console.print(f"{clave}: {valor}")
+			else:
+				console.print(f"\n{datos}")
+			
+			# Manejo de errores
+			if not mensaje and not datos:
+				if not res.ok:
+					print_error(f"Error al procesar la consulta: {res.mensaje or 'Error desconocido'}")
+				else:
+					console.print("La consulta fue procesada correctamente, pero no se recibieron datos.", style="dim")
+			
+			print_separador("─", 60)
+	
+	except KeyboardInterrupt:
+		# Manejo de Ctrl+C
+		console.print("\n\n👋 Chat interrumpido. Volviendo al menú...", style="bold cyan")
+	
+	finally:
+		# Limpiar pantalla al salir (opcional, comentado por defecto)
+		# os.system('cls' if os.name == 'nt' else 'clear')
+		console.print()  # Línea en blanco antes de volver al menú

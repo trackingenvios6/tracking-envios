@@ -10,7 +10,7 @@ from ui.menus import menu_principal
 from ui.validaciones import manejar_continuar
 from handlers.consultas import (
     consultar_estado_envio,
-    consulta_personalizada_directa,
+    iniciar_chat_con_piki,
 )
 from handlers.compartir import manejar_menu_compartir
 from handlers.reportes import manejar_menu_local
@@ -42,7 +42,7 @@ def main():
                 menu_activo = "compartir"
 
             elif opcion == "3":
-                consulta_personalizada_directa(id_sesion)
+                iniciar_chat_con_piki(id_sesion)
                 destino = manejar_continuar()
                 if destino == "salir":
                     break
