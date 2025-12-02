@@ -10,6 +10,13 @@ from ui.validaciones import (
 	solicitar_filtros_reparto,
 )
 from utils.helpers import obtener_mensaje_desde_data
+from ui.console_utils import (
+	print_procesando,
+	print_mensaje_n8n,
+	print_url,
+	print_error,
+	print_exito
+)
 
 
 def enviar_reporte_compartir(session_id: str, chat_input: str, descripcion: str, tipo: str, plataforma: str, params_extra = None) -> None:
@@ -21,6 +28,8 @@ def enviar_reporte_compartir(session_id: str, chat_input: str, descripcion: str,
 	if params_extra:
 		parametros.update({k: v for k, v in params_extra.items() if v is not None})
 
+	print_procesando(f"Generando {descripcion} para compartir, aguarde...")
+	
 	req = SolicitudN8n(
 		entrada_chat = chat_input,
 		id_sesion = session_id,
@@ -31,21 +40,21 @@ def enviar_reporte_compartir(session_id: str, chat_input: str, descripcion: str,
 	if res.ok:
 		mensaje = obtener_mensaje_desde_data(res.datos) or res.mensaje
 		if mensaje:
-			print(mensaje)
+			print_mensaje_n8n(mensaje)
 		if res.datos:
 			if isinstance(res.datos, dict):
-				url = res.datos.get("url") or res.datos.get("link")
+				url = res.datos.get("url") or res.datos.get("link") or res.datos.get("webViewLink") or res.datos.get("webContentLink")
 				if url:
-					print(f"Acceso directo: {url}")
-				descripcion = res.datos.get("descripcion")
-				if descripcion:
-					print(descripcion)
+					print_url(url)
+				descripcion_extra = res.datos.get("descripcion")
+				if descripcion_extra:
+					print(descripcion_extra)
 			else:
 				print(res.datos)
 		elif not mensaje:
-			print("n8n procesó la solicitud correctamente.")
+			print_exito("n8n procesó la solicitud correctamente.")
 	else:
-		print(f"Error al compartir el reporte: {res.mensaje}")
+		print_error(f"Error al compartir el reporte: {res.mensaje}")
 
 
 def manejar_menu_compartir(session_id: str) -> bool:
@@ -69,9 +78,10 @@ def manejar_menu_compartir(session_id: str) -> bool:
 			tipo = "repartidores"
 			parametros = filtros
 		elif opcion == "3":
+			print_info("Presiona Enter para volver al menú")
 			consulta = input("Ingrese la consulta personalizada que desea compartir: ").strip()
-			if not consulta:
-				print("La consulta no puede estar vacía.")
+			if not consulta or consulta == "0":
+				print_info("Operación cancelada.")
 				continue
 			descripcion = "el reporte personalizado solicitado"
 			tipo = "personalizado"
@@ -82,7 +92,7 @@ def manejar_menu_compartir(session_id: str) -> bool:
 			print("Saliendo del programa. Hasta luego!")
 			return False
 		else:
-			print("Opción inválida. Por favor, intente de nuevo.")
+			print_error("❌ Opción inválida. Por favor, intente de nuevo.")
 			continue
 
 		plataforma = seleccionar_plataforma_compartir()

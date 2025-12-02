@@ -5,6 +5,7 @@ Funciones que solicitan y validan datos al usuario. Migradas desde `main.py`.
 import re
 from typing import Optional
 from ui.menus import menu_plataforma_compartir, menu_continuar
+from ui.console_utils import print_error, print_info
 
 
 def validar_codigo_envio(codigo: str) -> bool:
@@ -25,7 +26,7 @@ def seleccionar_plataforma_compartir() -> str:
 			return "volver"
 		if opcion == "0":
 			return "salir"
-		print("Opción inválida. Intente nuevamente.")
+		print_error("❌ Opción inválida. Intente nuevamente.")
 
 
 def solicitar_email_destino() -> str:
@@ -35,40 +36,40 @@ def solicitar_email_destino() -> str:
 		correo = input("Ingrese el correo electrónico para la notificación: ").strip()
 		if re.fullmatch(patron, correo):
 			return correo
-		print("Correo inválido. Intente nuevamente.")
+		print_error("❌ Correo inválido. Intente nuevamente.")
 
 
 def solicitar_filtros_reparto():
 	"""Solicita al usuario los filtros para generar reporte de repartidores."""
+	from ui.menus import menu_criterio_repartidor
+	
 	while True:
-		print("=== Seleccione el criterio para el reporte de repartidores ===")
-		print("[1] Filtrar por localidad")
-		print("[2] Filtrar por repartidor")
-		print("[3] Filtrar por ambos")
-		print("[4] Cancelar")
-		opcion = input("Opción: ").strip()
+		menu_criterio_repartidor()
+		print_info("💡 Puedes cancelar con Enter o seleccionar [4]")
+		opcion = input("\nOpción: ").strip()
 		if opcion == "1":
 			localidad = input("Ingrese la localidad: ").strip()
 			if not localidad:
-				print("La localidad no puede estar vacía.")
+				print_error("❌ La localidad no puede estar vacía.")
 				continue
 			return {"localidad": localidad, "repartidor": None}
 		if opcion == "2":
 			repartidor = input("Ingrese el nombre del repartidor: ").strip()
 			if not repartidor:
-				print("El nombre del repartidor no puede estar vacío.")
+				print_error("❌ El nombre del repartidor no puede estar vacío.")
 				continue
 			return {"localidad": None, "repartidor": repartidor}
 		if opcion == "3":
 			localidad = input("Ingrese la localidad: ").strip()
 			repartidor = input("Ingrese el nombre del repartidor: ").strip()
 			if not localidad or not repartidor:
-				print("Debe completar ambos campos.")
+				print_error("❌ Debe completar ambos campos.")
 				continue
 			return {"localidad": localidad, "repartidor": repartidor}
-		if opcion == "4":
+		if opcion == "4" or opcion == "0" or not opcion:
+			print_info("Operación cancelada.")
 			return None
-		print("Opción inválida. Intente nuevamente.")
+		print_error("❌ Opción inválida. Intente nuevamente.")
 
 
 def manejar_continuar() -> str:

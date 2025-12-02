@@ -142,23 +142,31 @@ def _preview(df: pd.DataFrame, rows: int = 5) -> None:
         print(f"Total de filas: {len(df)}")
 
 
-def _menu_formato() -> str:
+def _menu_formato() -> str | None:
     """
     Muestra menú interactivo para seleccionar formato de reporte.
     
     Returns:
-        str: Formato seleccionado ("xlsx" o "csv")
+        str | None: Formato seleccionado ("xlsx" o "csv"), o None si se cancela
     """
+    from ui.menus import menu_formato_reporte
+    from ui.console_utils import print_info, print_error
+    
     while True:
-        print("=== Seleccione el formato del reporte ===")
-        print("[1] Excel (.xlsx)")
-        print("[2] CSV (.csv)")
-        opcion = input("Opción: ").strip()
+        menu_formato_reporte()
+        print_info("Presiona Enter o [0] para cancelar")
+        opcion = input("\\nOpción: ").strip()
+        
+        # Permitir cancelar
+        if not opcion or opcion == "0":
+            print_info("Operación cancelada.")
+            return None
+        
         if opcion == "1":
             return "xlsx"
         if opcion == "2":
             return "csv"
-        print("Opción inválida. Intente nuevamente.")
+        print_error("Opción inválida. Intente nuevamente.")
 
 
 def _dialogo_directorio() -> str:

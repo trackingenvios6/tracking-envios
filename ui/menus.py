@@ -228,3 +228,86 @@ def menu_plataforma_compartir():
 	
 	console.print(table)
 	console.print()
+
+
+def menu_criterio_repartidor():
+	"""Muestra el menú de selección de criterio para reporte de repartidores."""
+	console.print()
+	
+	# Título
+	title = Text()
+	title.append("🚚 ", style="bold yellow")
+	title.append("Criterio de Filtrado", style="bold cyan")
+	
+	console.print(Panel(
+		title,
+		border_style="cyan",
+		box=box.ROUNDED,
+		expand=False,
+		padding=(0, 2)
+	))
+	
+	console.print()
+	
+	# Tabla de opciones
+	table = Table(
+		show_header=False,
+		box=box.ROUNDED,
+		border_style="bright_cyan",
+		padding=(0, 2),
+		expand=False,
+		width=70
+	)
+	
+	table.add_column("Opción", style="bold cyan", width=8)
+	table.add_column("Descripción", style="bright_white")
+	
+	table.add_row("📍 [1]", "Filtrar por localidad")
+	table.add_row("🚴 [2]", "Filtrar por repartidor")
+	table.add_row("🔍 [3]", "Filtrar por ambos")
+	table.add_row("", "")
+	table.add_row("❌ [4]", "[red]Cancelar[/red]")
+	
+	console.print(table)
+	console.print()
+
+
+def menu_formato_reporte():
+	"""Muestra el menú de selección de formato para reportes."""
+	console.print()
+	
+	# Título
+	title = Text()
+	title.append("📄 ", style="bold yellow")
+	title.append("Formato del Reporte", style="bold green")
+	
+	console.print(Panel(
+		title,
+		border_style="green",
+		box=box.ROUNDED,
+		expand=False,
+		padding=(0, 2)
+	))
+	
+	console.print()
+	
+	# Tabla de opciones
+	table = Table(
+		show_header=False,
+		box=box.ROUNDED,
+		border_style="bright_green",
+		padding=(0, 2),
+		expand=False,
+		width=60
+	)
+	
+	table.add_column("Opción", style="bold green", width= 8)
+	table.add_column("Descripción", style="bright_white")
+	
+	table.add_row("📗 [1]", "Excel (.xlsx)")
+	table.add_row("📋 [2]", "CSV (.csv)")
+	table.add_row("", "")
+	table.add_row("❌ [0]", "[red]Cancelar[/red]")
+	
+	console.print(table)
+	console.print()

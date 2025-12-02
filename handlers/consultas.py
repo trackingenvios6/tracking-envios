@@ -7,56 +7,84 @@ from n8n_client import enviar_consulta
 from data_models import SolicitudN8n
 from ui.validaciones import validar_codigo_envio
 from utils.formateo import extraer_mensaje_y_datos, formatear_datos
+from ui.console_utils import (
+	print_procesando,
+	spinner_procesando,
+	print_mensaje_n8n,
+	print_url,
+	print_error,
+	print_campo,
+	print_info,
+	print_separador
+)
 
 
 def consultar_estado_envio(session_id: str) -> None:
 	"""Consulta y muestra el estado de un envío específico."""
+	print_info("Presiona Enter para volver al menú")
 	codigo = input("Ingrese el código de envío: ").strip()
+	
+	# Permitir cancelar con Enter o 0
+	if not codigo or codigo == "0":
+		print_info("Operación cancelada.")
+		return
+	
 	if not validar_codigo_envio(codigo):
-		print("Código de envío inválido. Debe contener entre 1 y 20 caracteres alfanuméricos.")
+		print_error("Código de envío inválido. Debe contener entre 1 y 20 caracteres alfanuméricos.")
 		return
 
+	
 	req = SolicitudN8n(
 		entrada_chat = f"Consultar estado del envío con código {codigo}",
 		id_sesion = session_id,
 		intencion = "consultar_estado",
 		parametros = {"codigo": codigo},
 	)
-	res = enviar_consulta(req)
+	
+	with spinner_procesando("Consultando estado del envío..."):
+		res = enviar_consulta(req)
+	
 	mensaje, datos = extraer_mensaje_y_datos(res)
 
 	if mensaje:
-		print(mensaje)
+		print_mensaje_n8n(mensaje)
+		
 	if datos:
+		print_separador()
 		if isinstance(datos, list) and len(datos) > 0:
 			# Si es una lista con elementos, tomar el primero
 			if isinstance(datos[0], dict):
 				datos_limpios = formatear_datos(datos[0])
 				for clave, valor in datos_limpios.items():
-					valor_mostrar = "No asignado" if valor is None else valor
-					print(f"{clave}: {valor_mostrar}")
+					print_campo(clave, valor)
 			else:
 				print(datos[0])
 		elif isinstance(datos, dict):
 			datos_limpios = formatear_datos(datos)
 			for clave, valor in datos_limpios.items():
-				valor_mostrar = "No asignado" if valor is None else valor
-				print(f"{clave}: {valor_mostrar}")
+				print_campo(clave, valor)
 		else:
 			print(datos)
+		print_separador()
+		
 	elif not mensaje:
-		print("No se encontró información para el código proporcionado.")
+		print_info("No se encontró información para el código proporcionado.")
 
 	if not res.ok and not mensaje:
-		print(f"Error al consultar el envío: {res.mensaje}")
+		print_error(f"Error al consultar el envío: {res.mensaje}")
 
 
 def consulta_personalizada_directa(session_id: str) -> None:
 	"""Procesa una consulta personalizada y muestra resultados directamente en consola."""
+	print_info("Presiona Enter para volver al menú")
 	consulta = input("Ingrese su consulta en lenguaje natural: ").strip()
-	if not consulta:
-		print("La consulta no puede estar vacía.")
+	
+	# Permitir cancelar con Enter o 0
+	if not consulta or consulta == "0":
+		print_info("Operación cancelada.")
 		return
+	
+	print_procesando("Procesando su consulta, aguarde...")
 	
 	req = SolicitudN8n(
 		entrada_chat = consulta,
@@ -69,18 +97,19 @@ def consulta_personalizada_directa(session_id: str) -> None:
 	
 	# Mostrar el mensaje si existe
 	if mensaje:
-		print(mensaje)
+		print_mensaje_n8n(mensaje)
 	
 	# Mostrar los datos si existen
 	if datos:
 		if isinstance(datos, list):
 			# Si es una lista de registros (como repartidores)
+			print_separador()
 			for idx, registro in enumerate(datos, 1):
-				print(f"\n--- Registro {idx} ---")
+				print_info(f"Registro {idx}")
 				if isinstance(registro, dict):
 					for clave, valor in registro.items():
-						valor_mostrar = "No asignado" if valor is None else valor
-						print(f"{clave}: {valor_mostrar}")
+						print_campo(clave, valor)
+					print_separador()
 				else:
 					print(registro)
 		elif isinstance(datos, dict):
@@ -91,7 +120,7 @@ def consulta_personalizada_directa(session_id: str) -> None:
 			       datos.get("webViewLink") or 
 			       datos.get("webContentLink"))
 			if url:
-				print(f"\n🔗 Acceso directo: {url}")
+				print_url(url)
 			
 			# Mostrar descripción si existe
 			descripcion_extra = datos.get("descripcion")
@@ -106,8 +135,7 @@ def consulta_personalizada_directa(session_id: str) -> None:
 			}
 			for clave, valor in datos.items():
 				if clave not in campos_mostrados:
-					valor_mostrar = "No asignado" if valor is None else valor
-					print(f"{clave}: {valor_mostrar}")
+					print_campo(clave, valor)
 		else:
 			# Cualquier otro tipo de dato
 			print(datos)

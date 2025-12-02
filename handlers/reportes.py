@@ -31,7 +31,10 @@ def generar_reporte_envios_fallidos(session_id: str, destino: str) -> None:
 		return
 
 	if destino == "local":
-		formato_local, directorio_local = obtener_configuracion_local()
+		config = obtener_configuracion_local()
+		if config is None:
+			return  # Usuario canceló
+		formato_local, directorio_local = config
 		path = exportar_reporte_local(registros, "reporte_envios_fallidos", formato_local, directorio_local)
 	else:
 		path = generar_reporte(registros, filename="reporte_envios_fallidos", formato="xlsx", preview=False)
@@ -59,7 +62,10 @@ def generar_reporte_repartidores(session_id: str, destino: str) -> None:
 		return
 
 	if destino == "local":
-		formato_local, directorio_local = obtener_configuracion_local()
+		config = obtener_configuracion_local()
+		if config is None:
+			return  # Usuario canceló
+		formato_local, directorio_local = config
 		path = exportar_reporte_local(registros, "reporte_localidad_repartidor", formato_local, directorio_local)
 	else:
 		path = generar_reporte(registros, filename="reporte_localidad_repartidor", formato="xlsx", preview=False)
@@ -85,7 +91,10 @@ def generar_consulta_personalizada_local(session_id: str) -> None:
 	if not valido:
 		return
 
-	formato_local, directorio_local = obtener_configuracion_local()
+	config = obtener_configuracion_local()
+	if config is None:
+		return  # Usuario canceló
+	formato_local, directorio_local = config
 	path = exportar_reporte_local(registros, "reporte_consulta_personalizada", formato_local, directorio_local)
 	if path:
 		mostrar_resultado_reporte(path, destino="local")
