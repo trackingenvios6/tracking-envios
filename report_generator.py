@@ -125,7 +125,7 @@ def _to_dataframe(data: Any) -> pd.DataFrame:
 
 def _preview(df: pd.DataFrame, rows: int = 5) -> None:
     """
-    Muestra una vista previa del DataFrame en consola.
+    Muestra una vista previa del DataFrame en consola con formato de tabla.
     
     Args:
         df (pd.DataFrame): DataFrame a previsualizar
@@ -135,7 +135,57 @@ def _preview(df: pd.DataFrame, rows: int = 5) -> None:
     if df.empty:
         print("(Sin registros para mostrar)")
         return
-    print(df.head(rows).to_string(index=False))
+    
+    # Configurar pandas para mejor visualización
+    pd.set_option('display.max_columns', None)
+    pd.set_option('display.max_colwidth', 40)
+    
+    preview_df = df.head(rows)
+    
+    # Obtener nombres de columnas y calcular anchos
+    columns = list(preview_df.columns)
+    col_widths = {}
+    
+    for col in columns:
+        # Ancho mínimo: el mayor entre el nombre de columna y el contenido
+        max_content_width = preview_df[col].astype(str).str.len().max()
+        col_widths[col] = max(len(str(col)), max_content_width, 8)  # mínimo 8
+    
+    # Crear línea separadora
+    separator_parts = ['+']
+    for col in columns:
+        separator_parts.append('-' * (col_widths[col] + 2))
+        separator_parts.append('+')
+    separator = ''.join(separator_parts)
+    
+    # Imprimir línea superior
+    print(separator)
+    
+    # Imprimir encabezado
+    header_parts = ['|']
+    for col in columns:
+        header_parts.append(f' {str(col):<{col_widths[col]}} ')
+        header_parts.append('|')
+    print(''.join(header_parts))
+    
+    # Línea separadora entre encabezado y datos
+    print(separator)
+    
+    # Imprimir filas de datos
+    for _, row in preview_df.iterrows():
+        row_parts = ['|']
+        for col in columns:
+            value = str(row[col]) if pd.notna(row[col]) else ''
+            # Truncar si es muy largo
+            if len(value) > col_widths[col]:
+                value = value[:col_widths[col]-3] + '...'
+            row_parts.append(f' {value:<{col_widths[col]}} ')
+            row_parts.append('|')
+        print(''.join(row_parts))
+    
+    # Línea inferior
+    print(separator)
+    
     if len(df) > rows:
         print(f"... ({len(df)} filas en total)")
     else:
@@ -155,7 +205,7 @@ def _menu_formato() -> str | None:
     while True:
         menu_formato_reporte()
         print_info("Presiona Enter o [0] para cancelar")
-        opcion = input("\\nOpción: ").strip()
+        opcion = input("Opción: ").strip()
         
         # Permitir cancelar
         if not opcion or opcion == "0":

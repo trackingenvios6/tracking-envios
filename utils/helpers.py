@@ -43,7 +43,5 @@ def mostrar_resultado_reporte(path: str, destino: str = "") -> None:
 	"""Muestra un mensaje con la ruta del reporte generado."""
 	if destino == "compartir":
 		print(f"Reporte generado y listo para compartir en plataforma: {path}")
-	elif destino == "local":
-		print(f"Reporte descargado localmente en: {path}")
-	else:
-		print(f"Reporte generado exitosamente: {path}")
+	# El mensaje de archivo guardado ya lo imprime generar_reporte() en report_generator.py
+	# No se imprime nada adicional para destino local
