@@ -60,3 +60,28 @@ def normalizar_registros_respuesta(datos):
 			return interno
 		return [datos]
 	return [datos]
+
+
+def filtrar_registros_vacios(datos):
+	"""
+	Filtra registros completamente vacíos ({}) de una lista.
+	
+	Mantiene diccionarios que tienen claves, incluso si los valores son None.
+	Esto permite que el código que muestra "No asignado" siga funcionando.
+	
+	Args:
+		datos: Puede ser lista, dict u otro tipo
+		
+	Returns:
+		Lista filtrada sin diccionarios vacíos o datos originales
+		
+	Examples:
+		>>> filtrar_registros_vacios([{}, {"nombre": "Juan"}])
+		[{"nombre": "Juan"}]
+		
+		>>> filtrar_registros_vacios([{"estado": None}])
+		[{"estado": None}]  # Se mantiene porque tiene claves
+	"""
+	if isinstance(datos, list):
+		return [d for d in datos if not (isinstance(d, dict) and len(d) == 0)]
+	return datos

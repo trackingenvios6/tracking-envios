@@ -6,7 +6,7 @@ Funciones movidas desde `main.py` sin cambios en la lógica.
 from n8n_client import enviar_consulta
 from data_models import SolicitudN8n
 from ui.validaciones import validar_codigo_envio
-from utils.formateo import extraer_mensaje_y_datos, formatear_datos
+from utils.formateo import extraer_mensaje_y_datos, formatear_datos, filtrar_registros_vacios
 from ui.console_utils import (
 	print_procesando,
 	spinner_procesando,
@@ -206,6 +206,9 @@ def iniciar_chat_con_piki(session_id: str) -> None:
 			
 			# Extraer mensaje y datos de la respuesta
 			mensaje, datos = extraer_mensaje_y_datos(res)
+			
+			# Filtrar registros completamente vacíos ({})
+			datos = filtrar_registros_vacios(datos)
 			
 			# Mostrar respuesta de Piki
 			print_separador("─", 60)
