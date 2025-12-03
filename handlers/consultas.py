@@ -216,56 +216,52 @@ def iniciar_chat_con_piki(session_id: str) -> None:
 				console.print(mensaje, style="cyan")
 			
 			# Mostrar los datos si existen
-		if datos:
-			if isinstance(datos, list) and len(datos) > 0:
-				console.print()
-				for idx, registro in enumerate(datos, 1):
-					console.print(f"\n  📋 Registro {idx}", style="bold blue")
-					if isinstance(registro, dict):
-						for clave, valor in registro.items():
-							# Formatear manualmente para evitar None
-							if valor is None:
-								console.print(f"    {clave}: No asignado", style="dim yellow")
-							else:
-								console.print(f"    {clave}: {valor}")
-					else:
-						console.print(f"    {registro}")
-					if idx < len(datos):
-						print_separador("·", 40)
-			elif isinstance(datos, dict):
-				url = (datos.get("url") or 
-				       datos.get("link") or 
-				       datos.get("webViewLink") or 
-				       datos.get("webContentLink"))
-				if url:
-					print_url(url)
-				
-				descripcion_extra = datos.get("descripcion")
-				if descripcion_extra:
-					console.print(f"\n📝 {descripcion_extra}")
-				
-				campos_mostrados = {
-					'url', 'link', 'webViewLink', 'webContentLink', 
-					'descripcion', 'accion', 'query_sql', 
-					'mensaje_ia', 'mensaje', 'message'
-				}
-				for clave, valor in datos.items():
-					if clave not in campos_mostrados:
-						if valor is None:
-							console.print(f"{clave}: No asignado", style="dim yellow")
+			if datos:
+				if isinstance(datos, list) and len(datos) > 0:
+					console.print()
+					for idx, registro in enumerate(datos, 1):
+						console.print(f"\n  📋 Registro {idx}", style="bold blue")
+						if isinstance(registro, dict):
+							for clave, valor in registro.items():
+								# Formatear manualmente para evitar None
+								if valor is None:
+									console.print(f"    {clave}: No asignado", style="dim yellow")
+								else:
+									console.print(f"    {clave}: {valor}")
 						else:
-							console.print(f"{clave}: {valor}")
-			else:
-				console.print(f"\n{datos}")
-			
-			# Manejo de errores
-			if not mensaje and not datos:
-				if not res.ok:
-					print_error(f"Error al procesar la consulta: {res.mensaje or 'Error desconocido'}")
+							console.print(f"    {registro} ")
+						if idx < len(datos):
+							print_separador("·", 40)
+				elif isinstance(datos, dict):
+					url = (datos.get("url"))
+					if url:
+						print_url(url)
+					
+					descripcion_extra = datos.get("descripcion")
+					if descripcion_extra:
+						console.print(f"\n📝 {descripcion_extra}")
+					
+					campos_mostrados = {
+						'url', 'descripcion', 'accion', 'query_sql', 
+						'mensaje_ia', 
+					}
+					for clave, valor in datos.items():
+						if clave not in campos_mostrados:
+							if valor is None:
+								console.print(f"{clave}: No asignado", style="dim yellow")
+							else:
+								console.print(f"{clave}: {valor}")
 				else:
-					console.print("La consulta fue procesada correctamente, pero no se recibieron datos.", style="dim")
-			
-			print_separador("─", 60)
+					console.print(f"\n{datos}")
+				
+				# Manejo de errores
+				if not mensaje and not datos:
+					if not res.ok:
+						print_error(f"Error al procesar la consulta: {res.mensaje or 'Error desconocido'}")
+					else:
+						console.print("La consulta fue procesada correctamente, pero no se recibieron datos.", style="dim")
+				
+				print_separador("─", 60)
 	
 	except KeyboardInterrupt:
 		# Manejo de Ctrl+C
