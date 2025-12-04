@@ -35,7 +35,7 @@ class RespuestaN8n:
     n8n devuelva un mensaje estructurado, datos adicionales o un error.
     """
 
-    def __init__(self, ok, mensaje=None, datos=None, error=None):
+    def __init__(self, ok, mensaje=None, datos=None, error=None, intencion=None):
         """
         Inicializa una respuesta proveniente de n8n.
 
@@ -44,8 +44,10 @@ class RespuestaN8n:
             mensaje (str, opcional): Mensaje generado por n8n o por el sistema.
             datos (any, opcional): Información devuelta por el workflow, puede ser dict, lista o valor primitivo.
             error (str, opcional): Descripción del error si la operación falló.
+            intencion (str, opcional): Intención estructurada detectada por n8n (ej: "reporte_local", "compartir").
         """
         self.ok = ok
         self.mensaje = mensaje
         self.datos = datos
         self.error = error
+        self.intencion = intencion
