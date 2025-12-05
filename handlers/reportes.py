@@ -15,6 +15,7 @@ from error_handler import (
 )
 from ui.validaciones import solicitar_filtros_reparto
 from utils.helpers import obtener_configuracion_local, exportar_reporte_local, mostrar_resultado_reporte
+from ui.console_utils import spinner_procesando
 
 
 def generar_reporte_envios_fallidos(session_id: str, destino: str) -> None:
@@ -25,7 +26,8 @@ def generar_reporte_envios_fallidos(session_id: str, destino: str) -> None:
 		intencion = "reporte_fallidos",
 	)
 
-	res = enviar_consulta(req)
+	with spinner_procesando("Consultando datos de envíos fallidos"):
+		res = enviar_consulta(req)
 	valido, registros, mensaje = validar_respuesta_n8n(res, MSG_SIN_ENVIOS_FALLIDOS)
 	if not valido:
 		return
@@ -56,7 +58,8 @@ def generar_reporte_repartidores(session_id: str, destino: str) -> None:
 		parametros = filtros,
 	)
 
-	res = enviar_consulta(req)
+	with spinner_procesando("Consultando datos de repartidores"):
+		res = enviar_consulta(req)
 	valido, registros, mensaje = validar_respuesta_n8n(res, MSG_SIN_DATOS_FILTRO)
 	if not valido:
 		return
@@ -86,7 +89,8 @@ def generar_consulta_personalizada_local(session_id: str) -> None:
 		id_sesion = session_id,
 		intencion = "consulta_personalizada",
 	)
-	res = enviar_consulta(req)
+	with spinner_procesando("Procesando consulta personalizada"):
+		res = enviar_consulta(req)
 	valido, registros, mensaje = validar_respuesta_n8n(res, MSG_SIN_DATOS_CONSULTA)
 	if not valido:
 		return

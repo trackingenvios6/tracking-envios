@@ -20,11 +20,11 @@ from ui.console_utils import (
 )
 
 
-def enviar_reporte_compartir(session_id: str, chat_input: str, descripcion: str, tipo: str, plataforma: str, params_extra = None) -> None:
+def enviar_reporte_compartir(session_id: str, chat_input: str, descripcion: str, tipo: str, intencion: str, params_extra = None) -> None:
 	"""Envía un reporte a n8n para ser compartido en una plataforma externa."""
 	parametros = {
 		"tipo": tipo,
-		"plataforma": plataforma,
+		"intencion": intencion,
 	}
 	if params_extra:
 		parametros.update({k: v for k, v in params_extra.items() if v is not None})
@@ -96,22 +96,22 @@ def manejar_menu_compartir(session_id: str) -> bool:
 			print_error("❌ Opción inválida. Por favor, intente de nuevo.")
 			continue
 
-		plataforma = seleccionar_plataforma_compartir()
-		if plataforma == "volver":
+		intencion = seleccionar_plataforma_compartir()
+		if intencion == "volver":
 			continue
-		if plataforma == "salir":
+		if intencion == "salir":
 			print("Saliendo del programa. Hasta luego!")
 			return False
 
 		# Solo solicitar email si la plataforma es Gmail
-		if plataforma == "gmail":
+		if intencion == "gmail":
 			correo = solicitar_email_destino()
 			parametros["email_destinatario"] = correo
 
 		entrada_chat = (
 			parametros.get("consulta")
 			if tipo == "personalizado"
-			else f"Compartir {descripcion} mediante {plataforma}"
+			else f"Compartir {descripcion} mediante {intencion}"
 		)
 
 		enviar_reporte_compartir(
@@ -119,7 +119,7 @@ def manejar_menu_compartir(session_id: str) -> bool:
 			chat_input = entrada_chat,
 			descripcion = descripcion,
 			tipo = tipo,
-			plataforma = plataforma,
+			intencion = intencion,
 			params_extra = parametros,
 		)
 		# Retornar True después de completar la acción
