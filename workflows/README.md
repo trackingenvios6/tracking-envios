@@ -1,7 +1,7 @@
 # Sistema Tracking - Grupo 6
 
-**Versión:** 2.0.0 (Update Piki & Data Cleaning)
-**Fecha:** 25-11-2025
+**Versión:** 2.1.0 (Update Piki & Modular Refactor)  
+**Fecha:** 05-12-2025
 
 ## 1. Estado Actual del Flujo (Snapshot)
 
@@ -9,84 +9,134 @@ El flujo ha evolucionado hacia una arquitectura más limpia y robusta. El "Cereb
 
 - **Punto de Entrada:**
   - **Producción:** Webhook (`POST /prueba`). Diseñado para ser consumido por el cliente en **Python**.
-  - **Debugging:** Chat Trigger. Se mantiene únicamente para pruebas internas dentro de n8n. En versiones anteriores se eliminará.
-- **Cerebro (AI Agent):** Agente actualizado a **"Piki"**.
-  - _Mejora v2.0:_ Ahora devuelve un campo `respuesta_ia` con un mensaje amigable en lenguaje natural, además de la data estructurada. Esto puede ser utilizado en Python para mostrar este mensaje por pantalla.
+  - **Sesión:** Utiliza `sessionId` del cuerpo de la solicitud para mantener contexto conversacional
+- **Cerebro (AI Agent):** Agente actualizado a **"Piki"** con Gemini AI.
+  - _Mejora v2.1:_ Ahora devuelve un campo `mensaje_ia` con un mensaje amigable en lenguaje natural, además de la data estructurada.
+  - _Sistema de memoria:_ Mantiene contexto de conversación con hasta 7 mensajes previos
+  - _Integración con Postgres:_ Utiliza herramienta SQL para consultas directas a la base de datos
+- **Validación de Datos:**
+  - Se implementó nodo de verificación (`Verifico si hay datos`) antes del Switch
+  - **Resultado:** Respuestas consistentes incluso cuando no hay datos disponibles
 - **Procesamiento de Datos:**
-  - Se implementaron nodos de limpieza (Javascript) previos a la generación de archivos.
-  - **Resultado:** Los archivos Excel generados contienen **únicamente** la data útil (sin columnas técnicas como `sql_query` o `accion`).
+  - Se implementaron nodos de limpieza (Javascript) previos a la generación de archivos
+  - **Resultado:** Los archivos Excel generados contienen **únicamente** la data útil (sin columnas técnicas como `sql_query` o `accion`)
 - **Ramas de Acción:**
-  - `drive`: Sube el reporte limpio a Google Drive.
-  - `enviar`: Envía el reporte limpio por Gmail.
-  - `descargar`: (WIP) Guardado en disco local.
-  - `visualizar`: Devuelve el JSON puro con la respuesta de Piki al cliente Python.
+  - `drive`: Sube el reporte limpio a Google Drive y devuelve URL
+  - `enviar`: Envía el reporte limpio por Gmail con plantilla HTML personalizada
+  - `descargar`: Devuelve datos para descarga local (procesado por cliente Python)
+  - `visualizar`: Devuelve el JSON puro con la respuesta de Piki al cliente Python
 
 ### Arquitectura del Flujo (Diagrama)
 
 ```mermaid
 graph TD
     %% Nodos de Entrada
-    subgraph Entrada ["📡 Inputs"]
-        A["Webhook (Cliente Python)"] -->|POST /prueba| C{"Agente Piki (AI)"}
-        B["Chat Trigger (Debug)"] -.->|Solo Pruebas| C
+    subgraph Entrada ["📡 Input"]
+        A["Webhook Cliente Python"] -->|POST /prueba + sessionId| C{"Agente Piki AI"}
     end
 
     %% El Cerebro
-    subgraph Cerebro ["🧠 Inteligencia (Gemini)"]
+    subgraph Cerebro ["🧠 Inteligencia Gemini + PostgreSQL"]
         C <-->|Consultas SQL| D[("Postgres Tool")]
-        C -->|JSON Crudo + respuesta_ia| E["Formateo y Validación (JS)"]
+        C <-->|Contexto 7 msgs| M[("Simple Memory")]
+        C -->|JSON + mensaje_ia| E["Formateo y Validación JS"]
+    end
+
+    %% Validación
+    subgraph Validacion ["✅ Validación"]
+        E -->|JSON Procesado| V{"Verifico si hay datos"}
+        V -->|Sin datos| R1["Respond: datos vacíos"]
     end
 
     %% Lógica de Negocio
     subgraph Enrutamiento ["🔀 Lógica de Negocio"]
-        E -->|JSON Validado| F{"Switch: ¿Qué acción?"}
+        V -->|Con datos| F{"Switch: ¿Qué acción?"}
     end
 
     %% Ramas de Salida y Limpieza
     subgraph Procesamiento ["🧹 Limpieza y Ejecución"]
-        F -->|accion: 'enviar'| G1["Limpieza JS"]
-        G1 --> G2["Generar Excel"] --> G3["Gmail Node"]
+        F -->|intencion: drive| G1["Limpieza JS"]
+        G1 --> G2["Generar Excel"] --> G3["Google Drive Upload"]
 
-        F -->|accion: 'drive'| H1["Limpieza JS"]
-        H1 --> H2["Generar Excel"] --> H3["Google Drive Upload"]
+        F -->|intencion: enviar| H1["Limpieza JS"]
+        H1 --> H2["Generar Excel"] --> H3["Gmail Send"]
 
-        F -->|accion: 'descargar'| I1["Limpieza JS"]
-        I1 --> I2["Generar Excel"] --> I3["Guardar en Disco (WIP)"]
+        F -->|intencion: descargar| I1["Limpieza JS"]
+        I1 --> I3["Respond: datos para descarga"]
 
-        F -->|accion: 'visualizar'| J["Respuesta JSON Directa"]
+        F -->|Default visualizar| J1["Formateo JS"]
+        J1 --> J["Respond: JSON directo"]
     end
 
     %% Respuesta Final
-    G3 --> K["Response to Webhook"]
-    H3 --> K
-    I3 --> K
-    J --> K
+    G3 --> K["Response con URL"]
+    H3 --> K2["Response con confirmación"]
+    I3 --> K3["Response con datos"]
+    J --> K4["Response con JSON"]
+    R1 --> K5["Response sin datos"]
 
     %% Estilos
     style C fill:#ff9900,stroke:#333,stroke-width:2px,color:white
     style A fill:#00cc66,stroke:#333,stroke-width:2px,color:white
+    style V fill:#9966ff,stroke:#333,stroke-width:2px,color:white
+    style M fill:#66ccff,stroke:#333,stroke-width:1px
     style G1 fill:#f9f,stroke:#333,stroke-width:1px,stroke-dasharray: 5 5
     style H1 fill:#f9f,stroke:#333,stroke-width:1px,stroke-dasharray: 5 5
     style I1 fill:#f9f,stroke:#333,stroke-width:1px,stroke-dasharray: 5 5
 
 ```
 
-# 2. Registro de Cambios (Changelog)
+---
 
-## ✅ Hitos Completados (FIXES v2.0)
+## 2. Registro de Cambios (Changelog)
 
-Limpieza de Excel Definitiva: Se solucionó el error donde los archivos exportados incluían columnas internas (accion, query). Ahora se usa un pre-procesamiento JS para filtrar solo el diccionario data.
+### ✅ Hitos Completados (v2.1)
 
-Integración de "Piki": Se actualizó el System Prompt. Ahora el JSON de respuesta incluye el campo mensaje_ia para dar contexto verbal al usuario, separándolo de los datos crudos.
+#### Sistema de Memoria Conversacional
+- **Implementado:** Simple Memory con contexto de 7 mensajes
+- **Beneficio:** Piki ahora recuerda el contexto de la conversación, permitiendo preguntas de seguimiento
+- **Uso:** El campo `sessionId` del webhook mantiene la sesión entre múltiples consultas
 
-Gmail: Confirmado el funcionamiento correcto del envío de adjuntos.
+#### Validación de Datos Mejorada
+- **Nuevo nodo:** "Verifico si hay datos" antes del Switch
+- **Comportamiento:** Si no hay datos disponibles, retorna respuesta vacía consistente en lugar de fallar
+- **Mejora:** Mejor experiencia de usuario con mensajes claros cuando no hay resultados
 
-## 🚧 Tareas Pendientes (WIP)
+#### Integración Directa con PostgreSQL
+- **Herramienta:** Execute a SQL query in Postgres
+- **Función:** Piki genera y ejecuta queries SQL directamente contra la base de datos
+- **Ventaja:** Datos en tiempo real sin necesidad de cache o datasets estáticos
 
-1. Lectura/Escritura Local: La rama de "descargar" y la interacción directa con el disco local (Read/Write Files) aún no están 100% implementadas/validadas.
+#### Limpieza de Excel Definitiva
+- Se solucionó el error donde los archivos exportados incluían columnas internas (`accion`, `query`)
+- Ahora se usa un pre-procesamiento JS para filtrar solo el diccionario `data`
+- **Resultado:** Archivos Excel limpios y profesionales
 
-2. Refactorización JS: Actualmente hay múltiples nodos de "Code in JavaScript" que hacen lo mismo (limpiar data) en diferentes ramas. Se buscará una forma de unificar esta lógica para no repetir código (DRY).
+#### Mejoras en Respuestas
+- Campo `mensaje_ia` para contexto verbal consistente en todas las respuestas
+- Plantilla HTML mejorada para emails de Gmail con imagen de Piki
+- URLs de Drive devueltas correctamente en campo `url`
+- Manejo de `email_destinatario` desde el JSON de Piki
 
-# Flujo actual
+#### Rama "Descargar" Funcional  
+- Cambio de estado: ~~WIP~~ → **Funcional**
+- Los datos se retornan al cliente Python para procesamiento local
+- El cliente maneja la generación del archivo (no n8n)
 
-![Descripción de la imagen](./images/25-11-25.png)
+### 🚧 Tareas Pendientes (Backlog)
+
+1. **Optimización de Prompts:** Continuar refinando el System Prompt de Piki para mejorar la precisión de las respuestas y reducir alucinaciones.
+
+2. **Refactorización JS:** Consolidar los múltiples nodos de "Code in JavaScript" que realizan limpieza similar en diferentes ramas. Implementar DRY (Don't Repeat Yourself) con funciones reutilizables.
+
+3. **Métricas y Logging:** Implementar seguimiento de uso (queries más frecuentes, tiempos de respuesta, errores) para optimización continua.
+
+4. **Caché de Queries:** Para consultas frecuentes idénticas, implementar sistema de caché temporal para mejorar velocidad de respuesta.
+
+---
+
+## 3. Flujo Actual
+
+![Workflow v16](./images/25-11-25.png)
+
+> **Nota:** La imagen puede no reflejar todos los cambios de v2.1. Referirse al diagrama Mermaid para arquitectura actualizada.
