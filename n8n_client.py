@@ -103,22 +103,24 @@ def enviar_consulta(solicitud: SolicitudN8n) -> RespuestaN8n:
 		datos_extraidos = elemento.get("data") if "data" in elemento else elemento
 		return RespuestaN8n(
 			ok=True,
-			mensaje=elemento.get("mensaje_ia") or elemento.get("mensaje"),
+			mensaje=elemento.get("mensaje_ia"),
 			datos=datos_extraidos,
+			intencion=elemento.get("intencion"),
 		)
 
 	# Caso 2: diccionario con estructura típica de n8n
 	if isinstance(contenido, dict) and (
 		"mensaje_ia" in contenido or
-		"mensaje" in contenido or
-		"data" in contenido
+		"data" in contenido or
+		"intencion" in contenido
 	):
 		# Si hay campo data, úsalo; si no, usa todo el contenido
 		datos_extraidos = contenido.get("data") if "data" in contenido else contenido
 		return RespuestaN8n(
 			ok=True,
-			mensaje=contenido.get("mensaje_ia") or contenido.get("mensaje"),
+			mensaje=contenido.get("mensaje_ia"),
 			datos=datos_extraidos,
+			intencion=contenido.get("intencion"),
 		)
 
 	# Caso 3: respuesta directa sin estructura conocida

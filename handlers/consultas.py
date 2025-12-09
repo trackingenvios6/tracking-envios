@@ -210,6 +210,33 @@ def iniciar_chat_con_piki(session_id: str) -> None:
 			# Filtrar registros completamente vacíos ({})
 			datos = filtrar_registros_vacios(datos)
 			
+			# ─────────────────────────────────────────────────────────────────
+			# DETECCIÓN DE INTENCIÓN: Guardado Local
+			# ─────────────────────────────────────────────────────────────────
+			# Si n8n indica que el usuario quiere un reporte local, interceptar
+			# y manejarlo sin salir del chat
+			from utils.intent_handler import es_reporte_local, ejecutar_guardado_local_desde_chat
+			
+			if es_reporte_local(res) and datos:
+				console.print("\n💾 Detecté que quieres guardar esto localmente\n", style="bold yellow")
+				
+				# Ejecutar guardado usando funciones existentes
+				path_guardado = ejecutar_guardado_local_desde_chat(
+					res=res,
+					nombre_base="reporte_chat_piki"
+				)
+				
+				if path_guardado:
+					console.print(f"\n✅ Reporte guardado exitosamente\n", style="bold green")
+				else:
+					console.print("\n⚠️  No se pudo guardar el reporte\n", style="yellow")
+				
+				# Continuar con el flujo normal del chat (mostrar separador y continuar)
+				print_separador("─", 60)
+				continue
+			
+			# ─────────────────────────────────────────────────────────────────
+				
 			# Mostrar respuesta de Piki
 			print_separador("─", 60)
 			console.print("🤖 Piki: ", style="bold cyan", end="")

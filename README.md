@@ -37,6 +37,7 @@ Las dependencias principales son:
 - `pandas` - Procesamiento y análisis de datos
 - `requests` - Comunicación con APIs y webhooks
 - `openpyxl` - Generación de archivos Excel
+- `rich` - Interfaz de consola mejorada con colores y formatos
 
 **Instalación directa:**
 ```bash
@@ -155,19 +156,35 @@ Al iniciar el programa verás:
 ```
 tracking-envios/
 │
-├── main.py                  # Punto de entrada principal
+├── main.py                  # Punto de entrada principal (minimalista)
 ├── n8n_client.py           # Cliente para comunicación con n8n
 ├── data_models.py          # Modelos de datos (clases Pydantic)
 ├── report_generator.py     # Generación de reportes Excel/CSV
 ├── error_handler.py        # Manejo centralizado de errores
 ├── config.py               # Configuración del sistema
 │
-├── requirements.txt        # Dependencias del proyecto
-├── README.md              # Este archivo
+├── handlers/               # Lógica de negocio por funcionalidad
+│   ├── consultas.py        # Consultas de envíos y chat con Piki
+│   ├── compartir.py        # Compartir reportes (Drive, Gmail, Sheets)
+│   └── reportes.py         # Generación de reportes locales
 │
-└── reportes/              # Directorio de reportes (generado)
-    ├── reporte_envios_fallidos_20231124_153045.xlsx
-    └── reporte_localidad_repartidor_20231124_154210.csv
+├── ui/                     # Interfaz de usuario en consola
+│   ├── menus.py            # Menús interactivos con Rich
+│   ├── validaciones.py     # Validación de entrada del usuario
+│   └── console_utils.py    # Utilidades de formato y colores
+│
+├── utils/                  # Utilidades y helpers
+│   ├── formateo.py         # Procesamiento de datos de n8n
+│   ├── helpers.py          # Funciones auxiliares
+│   └── intent_handler.py   # Manejo de intenciones especiales
+│
+├── workflows/              # Documentación de workflows n8n
+│   └── README.md           # Documentación del flujo n8n
+│
+├── demos/                  # Ejemplos y demos
+│
+├── requirements.txt        # Dependencias del proyecto
+└── README.md              # Este archivo
 ```
 
 ## 🏗️ Arquitectura
@@ -182,17 +199,36 @@ El sistema sigue una arquitectura modular:
        ▼
 ┌─────────────────────────────────────┐
 │           main.py                    │
-│  (Interfaz de usuario + Menús)      │
+│    (Loop principal y routing)        │
 └──────┬──────────────────────┬───────┘
        │                      │
        ▼                      ▼
 ┌──────────────┐      ┌──────────────────┐
-│ n8n_client   │      │ report_generator │
+│  ui/         │      │  handlers/       │
 │              │      │                  │
-│ - Enviar     │      │ - Normalizar     │
-│ - Recibir    │      │ - Generar Excel  │
-│ - Validar    │      │ - Generar CSV    │
-└──────┬───────┘      └──────────────────┘
+│ - menus      │◄─────│ - consultas      │
+│ - validation │      │ - compartir      │
+│ - console    │      │ - reportes       │
+└──────────────┘      └────────┬─────────┘
+                               │
+                               ▼
+                      ┌──────────────────┐
+                      │  utils/          │
+                      │                  │
+                      │ - formateo       │
+                      │ - helpers        │
+                      │ - intent_handler │
+                      └────────┬─────────┘
+                               │
+       ┌───────────────────────┼────────────────────┐
+       │                       │                    │
+       ▼                       ▼                    ▼
+┌──────────────┐      ┌──────────────┐     ┌──────────────────┐
+│ n8n_client   │      │ data_models  │     │ report_generator │
+│              │      │              │     │                  │
+│ - Enviar     │      │ - Solicitud  │     │ - Generar Excel  │
+│ - Recibir    │      │ - Respuesta  │     │ - Generar CSV    │
+└──────┬───────┘      └──────────────┘     └──────────────────┘
        │
        ▼
 ┌──────────────┐
@@ -214,18 +250,143 @@ El sistema sigue una arquitectura modular:
 
 ## 📚 Módulos
 
+El proyecto está organizado en una arquitectura modular con separación de responsabilidades:
+
 ### `main.py`
-**Módulo principal** que contiene:
-- Menús interactivos
-- Lógica de navegación
-- Funciones de consulta y reporte
-- Validación de entrada de usuario
+**Punto de entrada minimalista**:
+- Loop principal de la aplicación
+- Enrutamiento entre menús (principal, compartir, local)
+- Delegación de acciones a los handlers correspondientes
+- Gestión del ID de sesión único
 
 **Funciones clave:**
-- `main()` - Punto de entrada
-- `consultar_estado_envio()` - Consulta individual
-- `generar_reporte_envios_fallidos()` - Reporte de fallidos
+- `main()` - Inicializa el sistema y maneja el flujo principal
+
+---
+
+### `handlers/` - Lógica de Negocio
+
+#### `handlers/consultas.py`
+**Gestión de consultas y chat con Piki**:
+- Consulta de estado de envíos individuales
+- Chat conversacional con Piki (con memoria de sesión)
+- Procesamiento de consultas personalizadas
+
+**Funciones clave:**
+- `consultar_estado_envio()` - Consulta individual de envío
+- `iniciar_chat_con_piki()` - Chat infinito con contexto de sesión
 - `consulta_personalizada_directa()` - Consultas en lenguaje natural
+
+#### `handlers/compartir.py`
+**Compartir reportes en plataformas externas**:
+- Envío de reportes a Google Drive
+- Envío de reportes por Gmail
+- Gestión del menú de compartir
+
+**Funciones clave:**
+- `enviar_reporte_compartir()` - Envía reporte a n8n para compartir
+- `manejar_menu_compartir()` - Maneja submenú de compartir
+
+#### `handlers/reportes.py`
+**Generación de reportes locales**:
+- Reportes de envíos fallidos
+- Reportes filtrados por repartidor/localidad
+- Consultas personalizadas exportadas
+
+**Funciones clave:**
+- `generar_reporte_envios_fallidos()` - Reporte de fallidos
+- `generar_reporte_repartidores()` - Reporte con filtros
+- `generar_consulta_personalizada_local()` - Consulta como archivo
+- `manejar_menu_local()` - Maneja submenú de reportes locales
+
+---
+
+### `ui/` - Interfaz de Usuario
+
+#### `ui/menus.py`
+**Menús interactivos con Rich**:
+- Menús con formato y colores profesionales
+- Uso de tablas y paneles para mejor visualización
+- Diseño consistente en toda la aplicación
+
+**Funciones clave:**
+- `menu_principal()` - Menú principal de la app
+- `menu_compartir()` - Menú de compartir reportes
+- `menu_local()` - Menú de reportes locales
+- `menu_continuar()` - Navegación post-acción
+- `menu_plataforma_compartir()` - Selección de plataforma
+- `menu_criterio_repartidor()` - Filtros para reportes
+- `menu_formato_reporte()` - Selección de formato
+
+#### `ui/validaciones.py`
+**Validación de entrada del usuario**:
+- Validación de formatos (email, códigos)
+- Solicitud de datos con feedback visual
+- Manejo de navegación entre menús
+
+**Funciones clave:**
+- `validar_codigo_envio()` - Valida formato de código
+- `seleccionar_plataforma_compartir()` - Selección de Drive/Gmail
+- `solicitar_email_destino()` - Solicita y valida email
+- `solicitar_filtros_reparto()` - Filtros de localidad/repartidor
+- `manejar_continuar()` - Navegación después de acciones
+
+#### `ui/console_utils.py`
+**Utilidades de formato y colores**:
+- Funciones centralizadas para output colorido
+- Spinners animados durante procesamiento
+- Paneles y separadores para mejor legibilidad
+
+**Funciones clave:**
+- `spinner_procesando()` - Context manager con spinner animado
+- `print_mensaje_n8n()` - Mensajes de n8n en cyan
+- `print_error()` / `print_exito()` - Mensajes de estado
+- `print_url()` - URLs destacadas
+- `print_campo()` - Campos clave-valor formateados
+- `print_panel()` - Contenido en paneles con bordes
+
+---
+
+### `utils/` - Utilidades
+
+#### `utils/formateo.py`
+**Procesamiento de datos de n8n**:
+- Normalización de respuestas de n8n
+- Extracción de mensajes y datos
+- Filtrado de registros vacíos
+
+**Funciones clave:**
+- `formatear_datos()` - Filtra valores null/vacíos
+- `extraer_mensaje_y_datos()` - Extrae mensaje_ia y data
+- `normalizar_registros_respuesta()` - Convierte a lista de registros
+- `filtrar_registros_vacios()` - Elimina diccionarios vacíos
+
+#### `utils/helpers.py`
+**Funciones auxiliares**:
+- Extracción de mensajes de IA
+- Configuración de exportación
+- Generación de reportes locales
+
+**Funciones clave:**
+- `obtener_mensaje_desde_data()` - Extrae mensaje_ia de estructuras
+- `obtener_configuracion_local()` - Solicita formato y directorio
+- `exportar_reporte_local()` - Genera archivo local
+- `mostrar_resultado_reporte()` - Muestra confirmación
+
+#### `utils/intent_handler.py`
+**Manejo de intenciones especiales**:
+- Detección de intención de guardado local
+- Ejecución de guardado desde chat
+- Manejo de diferentes formatos (xlsx, json, csv)
+
+**Funciones clave:**
+- `es_reporte_local()` - Detecta intención de guardado
+- `ejecutar_guardado_local_desde_chat()` - Guarda desde chat con Piki
+- `solicitar_formato_guardado()` - Pregunta formato deseado
+
+---
+
+### Módulos Core
 
 ### `n8n_client.py`
 **Cliente HTTP** para comunicación con n8n:
@@ -266,7 +427,7 @@ El sistema sigue una arquitectura modular:
 **Funciones clave:**
 - `validar_respuesta_n8n()` - Valida y normaliza respuestas
 - `normalizar_registros_respuesta()` - Extrae datos de respuestas
-- `obtener_mensaje_desde_data()` - Extrae mensajes de IA
+- `mostrar_mensaje_si_existe()` - Muestra mensajes condicionales
 
 ### `config.py`
 **Configuración del sistema**:

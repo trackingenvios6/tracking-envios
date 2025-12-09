@@ -1,0 +1,691 @@
+{
+  "name": "Tracking de envios - GRUPO 6 (v16)",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.4
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -1248,
+        672
+      ],
+      "id": "ee38b315-1fe2-4a7b-a39a-d319eb2a44a4",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "qb224UDqH1JmD2La",
+          "name": "Google Gemini(PaLM) Api Personal stk"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cc040b19-7385-441f-af4d-0a30cc519038",
+                    "leftValue": "={{ $('Formateo del JSON').item.json.intencion }}",
+                    "rightValue": "drive",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "f3a5616d-a8ed-4252-a243-2ee5b3abfca3",
+                    "leftValue": "={{ $('Formateo del JSON').item.json.intencion }}",
+                    "rightValue": "enviar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "0229d61d-4836-4d67-88da-695dad368dc2",
+                    "leftValue": "={{ $('Formateo del JSON').item.json.intencion }}",
+                    "rightValue": "descargar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "ca2779bf-d5a3-4deb-94eb-cadf008f84c8",
+                    "leftValue": "={{ $('Formateo del JSON').item.json.intencion }}",
+                    "rightValue": "enviar,drive",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notEquals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        -592,
+        432
+      ],
+      "id": "0a1c0b6d-688c-4aa8-868e-4cde40d67992",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "prueba",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1424,
+        448
+      ],
+      "id": "664de969-7bd8-478d-b06e-1b7bce540f07",
+      "name": "Webhook",
+      "webhookId": "710b8009-9023-47a2-8b21-eab6b31b5273"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Este nodo procesa la salida del AI Agent (Piki) y prepara los datos para el Switch.\n// Toma el texto generado por la IA, extrae el JSON principal { \"accion\": \"...\", \"datos\": [...] }\n// Separa cada registro en el array \"datos\" en un item de n8n.\n// Añade la \"accion\" y el \"query_sql\" a cada uno de esos items para el Switch y la DB.\n\n// Asumimos que la salida de la IA está en el primer item de entrada.\nconst item = items[0];\n\ntry {\n  const fullOutput = item.json.output || '';\n\n  // ⿡ Buscar el JSON principal (debe ser un objeto que empiece con { y termine con })\n  const startIndex = fullOutput.indexOf('{');\n  const endIndex = fullOutput.lastIndexOf('}');\n\n  if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {\n    throw new Error(\"No se encontró un objeto JSON válido ({...}) en la salida de la IA.\");\n  }\n\n  // ⿢ Extraer y limpiar el string JSON\n  const jsonString = fullOutput.substring(startIndex, endIndex + 1).trim();\n\n  // ⿣ Parsear el JSON\n  const parsedJson = JSON.parse(jsonString);\n\n  // ⿤ Validar la estructura esperada (según el prompt de Piki)\n  if (!parsedJson.intencion || !parsedJson.datos || parsedJson.query_sql === undefined) {\n    // ------------------------ LÍNEA 28 CORREGIDA ------------------------\n    //throw new Error(`El JSON parseado no tiene la estructura esperada { \"intencion\": \"...\", \"datos\": [...], \"query_sql\": \"...\" }. Se recibió: ${jsonString}`);\n    // --------------------------------------------------------------------\n  }\n\n  // ⿥ Extraer la acción, los datos y la query\n  const intencion = parsedJson.intencion.trim().toLowerCase(); // Normalizamos la acción\n  const datosArray = parsedJson.datos;\n  const querySql = parsedJson.query_sql;\n  const mensajeIa = parsedJson.mensaje_ia || null; // Captura mensajes de error de la IA\n  const emailDestinatario = parsedJson.email_destinatario;\n  \n  // Validar que 'datos' sea un array\n  if (!Array.isArray(datosArray)) {\n     throw new Error(\"El campo 'datos' en el JSON no es un array.\");\n  }\n\n  // ⿦ Si 'datos' está vacío (ej. no hay resultados o es un error de la IA)\n  // Devolvemos un solo item con la acción y el mensaje (si existe)\n  if (datosArray.length === 0) {\n    return [{\n      json: {\n        intencion: intencion,\n        query_sql: querySql,\n        mensaje_ia: mensajeIa,\n        email_destinatario: emailDestinatario,\n        isEmpty: true, // Una bandera para saber que no hay datos\n        data: {} // Un objeto vacío para consistencia\n      }\n    }];\n  }\n\n  // ⿧ Devolver cada registro de 'datos' como un item separado,\n  //    con la 'accion' y 'query_sql' incluidas.\n  //    Esto permite que el nodo Switch evalúe CADA item por su 'accion'.\n  return datosArray.map(registro => ({\n    json: {\n      data: registro, // Los datos del registro (ej. { \"Cód. Envío\": \"E0004\", ... })\n      intencion: intencion, // La acción para el Switch (ej. \"enviar\")\n      query_sql: querySql, // La query para el nodo Postgres (ej. \"SELECT...\")\n      mensaje_ia: mensajeIa,\n      email_destinatario: emailDestinatario\n    }\n  }));\n\n} catch (er) {\n  console.log(\"Error al parsear JSON de Lía:\", er);\n  \n  // Devolver un item de error\n  return [{\n    json: {\n      error: \"Error al parsear el JSON\",\n      details: er.message,\n      originalOutput: item.json.output || 'Sin salida disponible'\n    }\n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -944,
+        448
+      ],
+      "id": "62c3af49-72e9-4083-9eb9-2e902f88498b",
+      "name": "Formateo del JSON"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body }}",
+        "options": {
+          "systemMessage": "=🧠 Contexto general\n\nEres Piki, un asistente virtual especializado en el sistema de gestión de envíos y logística.\nTu propósito es interpretar preguntas en lenguaje natural del usuario y devolver **SIEMPRE** un objeto JSON con los datos solicitados\n🎯 Objetivo principal\n\n1. Interpretar correctamente las consultas sobre el sistema logístico.\n2. Generar una respuesta basada en las vistas provistas.\n3. Utilizar nombres de columnas legibles para el usuario final (ej. \"Cód. Envío\", \"Remitente\").\n4. Omitir las columnas que representen llaves primarias o foráneas (id_, fk_, legajo, etc.) salvo que sean informativas.\n\n⚙ Contexto técnico SQL (Uso interno de Piki)\n\n1. Todas las tablas, vistas y funciones se encuentran dentro del esquema public.\n2. Todas las consultas DEBEN incluir el esquema (ej. public.vw_tracking).\n3. Todas las vistas y columnas deben usarse con sus nombres exactos (ej. vw_repartidor_Localidades).\n4. **IMPORTANTE: Para los alias (AS), DEBES usar comillas dobles (\").** Ejemplo: codigo_envio AS \"Cód. Envío\". **NUNCA uses comillas simples (').**\n\n🚫 Restricciones\n\n1. Si el usuario pide mostrar la base de datos, tablas o vistas, responde con:\n    { \"intencion\": \"visualizar\", \"datos\": [], \"mensaje_ia\": \"⚠ La operación solicitada no está habilitada. Realice otra consulta válida.\" }\n2. Si intenta usar INSERT, UPDATE, DELETE o DROP, responde con:\n    { \"intencion\": \"visualizar\", \"datos\": [], \"mensaje_ia\": \"⚠ Las operaciones de modificación no están permitidas. Solo puedes consultar información mediante SELECT.\" }\n3. Si la consulta está fuera del dominio logístico, responde con:\n    { \"intencion\": \"visualizar\", \"datos\": [], \"mensaje_ia\": \"Esa información no pertenece al sistema logístico.\" }\n4. **SIEMPRE que el usuario quiera solicitar información de la base de datos deberás utilizar la herramienta de Postgres para generar la query de SQL, no debes generar la query mediante el modelo de lenguaje. Y cuando te hagan solicitudes de información, solamente podes responder con información obtenida utilizando esta herramienta, sin excepciones. \n5. * NO USES TILDES PARA GENERAR LAS QUERYS DE SQL. *\n6. * SIEMPRE que recibas un campo \"intent\": \n\"consulta_personalizada\" desde el webhook responderas con lenguaje natural mediante el campo \"mensaje_ia\" *\n💬 Mensaje de bienvenida (Solo si el usuario dice \"hola\"): 👋 ¡Hola! Soy Piki, tu Asistente Virtual de Logística. Estoy aquí para ayudarte a obtener y gestionar información de envíos, reportes y seguimiento. Por favor, dime qué datos necesitas.\n7. **Cuando recibas un campo \"intent\" : \"consulta_personalizada\" deberás analizar la intención del usuario y revisar si está solicitando una descarga, exportación de archivos y todo lo relacionado a desgargar un reporte de forma local**.\n8. VERIFICA QUE SI TENES UN CAMPO DATA Y NO ESTE VACIO, EL MENSAJE_IA COINCIDA: QUE TENGA COHERENCIA.\n\n\n📚 Vistas y Columnas Reales (Uso Interno)\nEsta es la estructura que DEBES usar para las consultas:\n\n1. *public.vw_tracking* (Tracking completo de envíos)\n    * codigo_envio, peso, largo, alto, ancho, tipo_envio, fecha_creacion, nombre_remitente, apellido_remitente, email_remitente, localidad_remitente, provincia_remitente, direccion_remitente_completa, nombre_destinatario, apellido_destinatario, email_destinatario, localidad_destino, provincia_destino, direccion_destino_completa, estado_actual, fecha_ultimo_movimiento, centro_actual, repartidor_actual, motivo_fallo *\n\n2. *public.vw_historial_movimientos* (Historial de un envío)\n    * codigo_envio, fecha_hora_movimiento, estado, centro_distribucion, repartidor_responsable, motivo_de_fallo *\n\n3. *public.vw_envios_fallidos_detalle* (Solo envíos fallidos)\n    * codigo_envio, remitente_nombre, remitente_email, destinatario_nombre, destinatario_direccion, motivo_de_fallo, fecha_fallo, fecha_creacion *\n\n4. *public.vw_repartidor_localidades* (Localidades de entrega por repartidor)\n    * legajo, nombre_repartidor, telefono_repartidor, email_repartidor, localidad_asignada, provincia_asignada, codigo_postal *\n\n5. *vw_tasa_exito_repartidores* (Tasa de repartidores exitosos)\n    * repartidor_nombre, total_intentos_entrega, total_entregados, total_fallidos tasa_exito_porcentaje*\n\n\n📚 Funciones disponibles y Parametros (Uso Interno)\n1. *fn_envios_realizados_por_dni(dni)* \n\n\n🧩 Comportamiento esperado\n1. Si la consulta coincide con una vista, generas los datos mentalmente usando las columnas listadas.\n2. Al renombrar columnas (ej. direccion_destino_completa → \"Dirección Destino\"), asegúrate de que la columna original existe en la vista.\n\n📤 Formato de salida (¡¡MUY IMPORTANTE!!)\n\nNUNCA respondas con texto conversacional, saludos o explicaciones (como \"Aquí tienes...\", \"Claro...\", \"Este es el informe...\") si no es con el mensaje de bienvenida.\nNUNCA uses formato Markdown.\n\nTu única y absoluta salida DEBE ser un objeto JSON válido que comience con { y termine con } y siga esta estructura exacta:\n\n{\n  \"intencion\": \"string\",\n  \"datos\": [\n    { \"Columna Legible 1\": \"valor1\", \"Columna Legible 2\": \"valor2\" },\n    { \"Columna Legible 1\": \"valor3\", \"Columna Legible 2\": \"valor4\" }\n  ],\n  \"query_sql\": \"string\",\n  \"mensaje_ia\" : \"string\",\n  \"email_destinatario\" : \"string\"\n}\n\n- \"intencion\" (string): Debe ser **\"visualizar\" (default)** si el usuario pide ver/mostrar datos. Usa \"descargar\", \"drive\" o **\"enviar\"** SOLAMENTE si el usuario lo pide explícitamente (ej. \"enviame por correo\").\n- \"datos\" (array): Un array de objetos con los resultados. CADA CLAVE debe ser un nombre legible (ej. \"Cód. Envío\"). Si no hay resultados, debe ser un array vacío [].\n- \"query_sql\" (string): La consulta SQL (SELECT) que usarías para obtener esos datos.\n- \"mensaje_ia\" (string): Es la respuesta en lenguaje natural a la consulta del usuario.\n- \"email_destinatario\" (string): Es el email del usuario al que debés enviar el reporte que solicite siempre que la \"intencion\" sea \"enviar\"\n\n📊 Ejemplos de consultas y respuestas esperadas, **NO ES UNA CONSULTA QUE DEBAS EJECUTAR, SINO QUE TENES QUE TOMARLA COMO EJEMPLO PARA REALIZAR LAS CONSULTAS SOLICITADAS POR EL USUARIO**\n\n* Consulta del usuario: “Mostrame los envíos fallidos”\n* **Respuesta JSON esperada:**\n{\n  \"intencion\": \"visualizar\",\n  \"datos\": [\n    { \"Cód. Envío\": \"AB0012352\", \"Remitente\": \"Javier\", \"Destinatario\": \"Javier\", \"Dirección Destino\": \"Juramento 1800\", \"Motivo de Fallo\": \"Dirección incorrecta\", \"Fecha Fallo\": \"2025-10-21\" }\n  ],\n  \"query_sql\": \"SELECT codigo_envio AS 'Cód. Envío', remitente_nombre AS 'Remitente', destinatario_nombre AS 'Destinatario', destinatario_direccion AS 'Dirección Destino', motivo_de_fallo AS 'Motivo de Fallo', fecha_fallo AS 'Fecha Fallo' FROM public.vw_envios_fallidos_detalle;\",\n  \"mensaje_ia\" : \"El historial del envío con código E0004 ha sido generado correctamente\",\n  \"email_destinatario\" : \"juanperez@gmail.com\"\n}\n\n* Consulta del usuario: “Ver historial del envío E0004”\n* **Respuesta JSON esperada:**\n{\n  \"intencion\": \"visualizar\",\n  \"datos\": [\n    { \"Fecha y Hora\": \"2025-10-21 09:00\", \"Estado\": \"En preparación\", \"Centro\": \"Depósito Central\", \"Repartidor\": \"Ana\" },\n    { \"Fecha y Hora\": \"2025-10-21 14:30\", \"Estado\": \"Intento de entrega\", \"Centro\": \"Depósito Central\", \"Repartidor\": \"Ana\", \"Motivo Fallo\": \"Dirección incorrecta\" }\n  ],\n  \"query_sql\": \"SELECT fecha_hora_movimiento AS 'Fecha y Hora', estado AS 'Estado', centro_distribucion AS 'Centro', repartidor_responsable AS 'Repartidor', motivo_de_fallo AS 'Motivo Fallo' FROM public.vw_historial_movimientos WHERE codigo_envio = 'AB0012352';\",\n  \"mensaje_ia\" : \"El historial del envío con código E0004 ha sido generado correctamente\",\n  \"email_destinatario\" : \"juanperez@gmail.com\"\n}\n\n* Consulta del usuario: “Exportar los envíos fallidos”\n* Respuesta JSON esperada:\n{\n  \"intencion\": \"descargar\",\n  \"datos\": [\n    { \"Cód. Envío\": \"AB0012352\", \"Remitente\": \"Javier\", \"Destinatario\": \"Javier\", \"Dirección Destino\": \"Juramento 1800\", \"Motivo de Fallo\": \"Dirección incorrecta\", \"Fecha Fallo\": \"2025-10-21\" }\n  ],\n  \"query_sql\": \"SELECT codigo_envio AS \"Cód. Envío\", remitente_nombre AS \"Remitente\", destinatario_nombre AS \"Destinatario\", destinatario_direccion AS \"Dirección Destino\", motivo_de_fallo AS \"Motivo de Fallo\", fecha_fallo AS \"Fecha Fallo\" FROM public.vw_envios_fallidos_detalle;\",\n  \"mensaje_ia\" : \"El informe con la información del envío con codigo E0004 ha sido descargado correctamente\",\n  \"email_destinatario\" : \"juanperez@gmail.com\"\n}\n\n* Consulta del usuario: “Subí el tracking del E0004 a Drive”\n* Respuesta JSON esperada:\n{\n  \"intencion\": \"drive\",\n  \"datos\": [\n    { \"Cód. Envío\": \"AB0012352\", \"Estado Actual\": \"Entrega fallida\", \"Destinatario\": \"Javier\", \"Dirección Destino\": \"Juramento 1800\", \"Llegada Estimada\": \"2025-10-21\", \"Repartidor\": \"Ana\" }\n  ],\n  \"query_sql\": \"SELECT codigo_envio AS \"Cód. Envío\", estado_actual AS \"Estado Actual\", nombre_destinatario AS \"Destinatario\", direccion_destino_completa AS \"Dirección Destino\", llegada_estimada AS \"Llegada Estimada\", repartidor_actual AS \"Repartidor\" FROM public.vw_tracking WHERE codigo_envio = 'AB0012353';\",\n  \"mensaje_ia\" : \"El informe del envío con código AB0012353 se ha subido a Drive\",\n  \"email_destinatario\" : \"juanperez@gmail.com\"\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -1248,
+        448
+      ],
+      "id": "f55cc337-3b45-41e7-9e74-2d03a5d18a08",
+      "name": "PIKI agent"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $fromAI(\"query\") }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        -1104,
+        944
+      ],
+      "id": "0e6f8171-2e5f-4bc8-8a4d-bbf3f898008c",
+      "name": "Execute a SQL query in Postgres",
+      "credentials": {
+        "postgres": {
+          "id": "ldrh89ZqDAeTuCn2",
+          "name": "Postgres account Personal sguzm"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{$json.body.sessionId}}",
+        "contextWindowLength": 7
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -1152,
+        784
+      ],
+      "id": "b40df1f4-92ac-4ceb-b034-ed3042b10d7f",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        -384,
+        128
+      ],
+      "id": "2e4fb0de-34d4-47ea-9d04-c7c51ab82281",
+      "name": "Respond to Webhook2"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  return {\n    json: item.json.data\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -384,
+        448
+      ],
+      "id": "4400dcf1-7c6b-401e-85f9-90d9a526c035",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"data\": \"{{ $json.webViewLink }}\",\n  \"mensaje_ia\" : \"{{ $('Formateo del JSON').first().json.mensaje_ia }}\"\n} ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        576,
+        448
+      ],
+      "id": "8c4b4bc6-5495-41bb-9145-5bc9c02fc963",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "binaryPropertyName": "=data",
+        "options": {
+          "fileName": "Informe"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        -48,
+        272
+      ],
+      "id": "8a7442f8-39d0-4e2a-a5f1-51b54fbed3ab",
+      "name": "Convert to File3"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "binaryPropertyName": "=data",
+        "options": {
+          "fileName": "Informe"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        -48,
+        448
+      ],
+      "id": "93d7468b-5997-4ec8-a48a-780c0880ab9b",
+      "name": "Convert to File"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\n// Armamos el array con los datos individuales\nconst datos = items.map(i => i.json.data);\n\n// Suponemos que el mensaje_ia es igual para todos, tomamos el del primero\nconst mensajeIA = items[0]?.json.mensaje_ia || '';\n\nreturn [{\n  json: {\n    data: datos,\n    mensaje_ia: mensajeIA\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -384,
+        800
+      ],
+      "id": "684fc42d-aaec-4760-8453-c58175901aa4",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  return {\n    json: item.json.data\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -384,
+        272
+      ],
+      "id": "fc2bed23-a5ce-4a5b-82b8-d0d8d54f0896",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "name": "Nuevo excel",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1dfi7DdAvSl2FV8-vLe2MoxZ8uj2kl3X8",
+          "mode": "list",
+          "cachedResultName": "Pruebas de Drive - n8n",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1dfi7DdAvSl2FV8-vLe2MoxZ8uj2kl3X8"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        256,
+        272
+      ],
+      "id": "fdce8b26-e144-4280-927e-0804377f4ab1",
+      "name": "Upload file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "3SUDGf9QPtYsLqVY",
+          "name": "Google Drive account trackin 83"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        576,
+        800
+      ],
+      "id": "f14c23c5-4894-4ec6-a39e-85f0ba976033",
+      "name": "Respond to Webhook3"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"url\": \"{{ $json.webViewLink }}\",\n  \"mensaje_ia\": \"{{ $('Formateo del JSON').first().json.mensaje_ia }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        576,
+        272
+      ],
+      "id": "246e9eef-ae36-4db4-a19d-e8ac2fb1baa4",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Formateo del JSON').first().json.email_destinatario }}",
+        "subject": "Informe",
+        "message": "<div style=\"font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f2f5f8; padding: 40px 20px;\">      <div style=\"max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1);\">          <div style=\"background-color: #5dade2; padding: 30px 40px; text-align: center;\">                <img src=\"https://i.imgur.com/v96Pqz3.png\" alt=\"Piki Robot\" style=\"width: 140px; height: auto; display: block; margin: 0 auto 15px auto;\">                <h1 style=\"color: #ffffff; margin: 0; font-size: 22px; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.1);\">¡Nuevo informe listo!</h1>     </div>          <div style=\"padding: 40px;\">       <p style=\"color: #333333; font-size: 16px; line-height: 1.6; margin-top: 0;\">         <strong>¡Hola! Soy Piki 📦</strong>       </p>       <p style=\"color: #555555; font-size: 16px; line-height: 1.6;\">         Te traigo buenas noticias: el proceso automático ha terminado correctamente. Acá tenes el informe que solicitaste.       </p>              <p style=\"color: #555555; font-size: 16px; line-height: 1.6; margin-top: 30px;\">         ¡Que tengas un excelente día!       </p>     </div>          <div style=\"background-color: #eeeeee; padding: 15px; text-align: center; font-size: 12px; color: #888888;\">       Enviado automáticamente • Powered by n8n & Piki     </div>        </div> </div>",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {
+                "property": "=data"
+              }
+            ]
+          },
+          "senderName": "PIKI"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        256,
+        448
+      ],
+      "id": "27e2a39b-e75b-410d-ba23-44411dc0a64e",
+      "name": "Send a message",
+      "webhookId": "98b4bbd0-8bf4-4526-ada3-4938a64aba31",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "wvuH06jhsyLzjSiJ",
+          "name": "Gmail account tracking 83"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2c68ed0b-db28-4db6-8a0b-07988d844850",
+              "leftValue": "={{ $json.data }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -784,
+        448
+      ],
+      "id": "898dbba9-7da8-46c6-96d2-bf8f76e6d689",
+      "name": "Verifico si hay datos"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst datos = items.map(item => item.json.data);\n\n\nconst metadata = items[0].json;\n\nreturn [{\n  json: {\n    data: datos,\n    intencion: metadata.intencion\n  }\n}]\n\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -384,
+        624
+      ],
+      "id": "82f92f7d-01e7-4023-9d07-8e7048a230ec",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        576,
+        624
+      ],
+      "id": "f79c5d0a-c928-46d0-a846-3d6f6e4908b5",
+      "name": "Respond to Webhook6"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "PIKI agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formateo del JSON": {
+      "main": [
+        [
+          {
+            "node": "Verifico si hay datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PIKI agent": {
+      "main": [
+        [
+          {
+            "node": "Formateo del JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "PIKI agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query in Postgres": {
+      "ai_tool": [
+        [
+          {
+            "node": "PIKI agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "PIKI agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Convert to File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Convert to File3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert to File3": {
+      "main": [
+        [
+          {
+            "node": "Upload file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload file": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verifico si hay datos": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "bbcc52c6-1a9c-4985-b19d-81ea2f61c929",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8e9d4f69c6ad4a0b45d5fd8be4168c67521390701067b86a8e59c966a43c30c0"
+  },
+  "id": "yBoOhleGDsNHMXly",
+  "tags": []
+}
