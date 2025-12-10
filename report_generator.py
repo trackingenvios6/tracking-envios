@@ -123,13 +123,14 @@ def _to_dataframe(data: Any) -> pd.DataFrame:
     return pd.DataFrame(registros, columns=["valor"])
 
 
-def _preview(df: pd.DataFrame, rows: int = 5) -> None:
+def _preview(df: pd.DataFrame, rows: int = 5, max_cols: int = 5) -> None:
     """
     Muestra una vista previa del DataFrame en consola con formato de tabla.
     
     Args:
         df (pd.DataFrame): DataFrame a previsualizar
         rows (int, optional): Número de filas a mostrar. Default: 5
+        max_cols (int, optional): Número máximo de columnas a mostrar. Default: 5
     """
     print("\n=== Vista previa del reporte ===")
     if df.empty:
@@ -142,14 +143,33 @@ def _preview(df: pd.DataFrame, rows: int = 5) -> None:
     
     preview_df = df.head(rows)
     
-    # Obtener nombres de columnas y calcular anchos
-    columns = list(preview_df.columns)
+    # Obtener nombres de columnas y limitar si hay muchas
+    all_columns = list(preview_df.columns)
+    total_cols = len(all_columns)
+    
+    # Si hay más columnas que el límite, truncar y agregar indicador
+    if total_cols > max_cols:
+        columns = all_columns[:max_cols]
+        columns_hidden = total_cols - max_cols
+        show_hidden_indicator = True
+    else:
+        columns = all_columns
+        columns_hidden = 0
+        show_hidden_indicator = False
+    
+    # Calcular anchos de columnas
     col_widths = {}
     
     for col in columns:
         # Ancho mínimo: el mayor entre el nombre de columna y el contenido
         max_content_width = preview_df[col].astype(str).str.len().max()
         col_widths[col] = max(len(str(col)), max_content_width, 8)  # mínimo 8
+    
+    # Si hay columnas ocultas, agregar columna indicadora "..."
+    if show_hidden_indicator:
+        indicator_col = "..."
+        columns.append(indicator_col)
+        col_widths[indicator_col] = 5
     
     # Crear línea separadora
     separator_parts = ['+']
@@ -175,10 +195,14 @@ def _preview(df: pd.DataFrame, rows: int = 5) -> None:
     for _, row in preview_df.iterrows():
         row_parts = ['|']
         for col in columns:
-            value = str(row[col]) if pd.notna(row[col]) else ''
-            # Truncar si es muy largo
-            if len(value) > col_widths[col]:
-                value = value[:col_widths[col]-3] + '...'
+            if col == "...":
+                # Columna indicadora de columnas ocultas
+                value = "..."
+            else:
+                value = str(row[col]) if pd.notna(row[col]) else ''
+                # Truncar si es muy largo
+                if len(value) > col_widths[col]:
+                    value = value[:col_widths[col]-3] + '...'
             row_parts.append(f' {value:<{col_widths[col]}} ')
             row_parts.append('|')
         print(''.join(row_parts))
@@ -186,10 +210,16 @@ def _preview(df: pd.DataFrame, rows: int = 5) -> None:
     # Línea inferior
     print(separator)
     
-    if len(df) > rows:
-        print(f"... ({len(df)} filas en total)")
+    # Mostrar información de filas y columnas
+    if len(df) > rows or show_hidden_indicator:
+        info_parts = []
+        if len(df) > rows:
+            info_parts.append(f"{len(df)} filas en total")
+        if show_hidden_indicator:
+            info_parts.append(f"{columns_hidden} columna{'s' if columns_hidden > 1 else ''} oculta{'s' if columns_hidden > 1 else ''}")
+        print(f"... ({', '.join(info_parts)})")
     else:
-        print(f"Total de filas: {len(df)}")
+        print(f"Total: {len(df)} fila{'s' if len(df) != 1 else ''}, {total_cols} columna{'s' if total_cols != 1 else ''}")
 
 
 def _menu_formato() -> str | None:
