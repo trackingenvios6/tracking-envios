@@ -62,7 +62,7 @@ pip install -r requirements.txt
 
 ### Paso 1: Clonar o descargar el proyecto
 ```bash
-git clone <url-del-repositorio>
+git clone https://github.com/trackingenvios6/tracking-envios.git
 cd tracking-envios
 ```
 
@@ -557,5 +557,6 @@ sudo dnf install python3-tkinter
 Para reportar bugs o solicitar nuevas funcionalidades, contacta al equipo de desarrollo.
 
 ---
+
 
 **Desarrollado para Piki** - Tu envío, sin estrés 📦✨
