@@ -1,0 +1,931 @@
+{
+  "name": "Tracking de envios - GRUPO 6 v18 (Documentado)",
+  "nodes": [
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{$json.body.sessionId}}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -1088,
+        880
+      ],
+      "id": "beb6fa9e-7395-4355-bee6-f10c8e0a8b2f",
+      "name": "Memoria de PIKI"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $fromAI(\"query\") }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        -688,
+        864
+      ],
+      "id": "6e723e3a-6f19-4208-aa4b-6aaefde6357e",
+      "name": "Consultas SQL de PIKI",
+      "credentials": {
+        "postgres": {
+          "id": "ccOJew8EfGVPc6oJ",
+          "name": "Sistema de consulta de envíos"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -1360,
+        880
+      ],
+      "id": "a485243d-5109-4d6e-80e9-15c30df1fe17",
+      "name": "LLM de PIKI",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "sFmkWV4af78vg0lv",
+          "name": "Credenciales personales"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Este nodo procesa la salida del AI Agent (Piki) y prepara los datos para el Switch.\n// Toma el texto generado por la IA, extrae el JSON principal { \"accion\": \"...\", \"datos\": [...] }\n// Separa cada registro en el array \"datos\" en un item de n8n.\n// Añade la \"accion\" y el \"query_sql\" a cada uno de esos items para el Switch y la DB.\n\n// Asumimos que la salida de la IA está en el primer item de entrada.\nconst item = items[0];\n\ntry {\n  const fullOutput = item.json.output || '';\n\n  // ⿡ Buscar el JSON principal (debe ser un objeto que empiece con { y termine con })\n  const startIndex = fullOutput.indexOf('{');\n  const endIndex = fullOutput.lastIndexOf('}');\n\n  if (startIndex === -1 || endIndex === -1 || endIndex < startIndex) {\n    throw new Error(\"No se encontró un objeto JSON válido ({...}) en la salida de la IA.\");\n  }\n\n  // ⿢ Extraer y limpiar el string JSON\n  const jsonString = fullOutput.substring(startIndex, endIndex + 1).trim();\n\n  // ⿣ Parsear el JSON\n  const parsedJson = JSON.parse(jsonString);\n\n  // ⿤ Validar la estructura esperada (según el prompt de Piki)\n  if (!parsedJson.intencion || !parsedJson.datos || parsedJson.query_sql === undefined) {\n    // ------------------------ LÍNEA 28 CORREGIDA ------------------------\n    //throw new Error(`El JSON parseado no tiene la estructura esperada { \"intencion\": \"...\", \"datos\": [...], \"query_sql\": \"...\" }. Se recibió: ${jsonString}`);\n    // --------------------------------------------------------------------\n  }\n\n  // ⿥ Extraer la acción, los datos y la query\n  const intencion = parsedJson.intencion.trim().toLowerCase(); // Normalizamos la acción\n  const datosArray = parsedJson.datos;\n  const querySql = parsedJson.query_sql;\n  const mensajeIa = parsedJson.mensaje_ia || null; // Captura mensajes de error de la IA\n  const emailDestinatario = parsedJson.email_destinatario;\n  \n  // Validar que 'datos' sea un array\n  if (!Array.isArray(datosArray)) {\n     throw new Error(\"El campo 'datos' en el JSON no es un array.\");\n  }\n\n  // ⿦ Si 'datos' está vacío (ej. no hay resultados o es un error de la IA)\n  // Devolvemos un solo item con la acción y el mensaje (si existe)\n  if (datosArray.length === 0) {\n    return [{\n      json: {\n        intencion: intencion,\n        query_sql: querySql,\n        mensaje_ia: mensajeIa,\n        email_destinatario: emailDestinatario,\n        isEmpty: true, // Una bandera para saber que no hay datos\n        data: {} // Un objeto vacío para consistencia\n      }\n    }];\n  }\n\n  // ⿧ Devolver cada registro de 'datos' como un item separado,\n  //    con la 'accion' y 'query_sql' incluidas.\n  //    Esto permite que el nodo Switch evalúe CADA item por su 'accion'.\n  return datosArray.map(registro => ({\n    json: {\n      data: registro, // Los datos del registro (ej. { \"Cód. Envío\": \"E0004\", ... })\n      intencion: intencion, // La acción para el Switch (ej. \"enviar\")\n      query_sql: querySql, // La query para el nodo Postgres (ej. \"SELECT...\")\n      mensaje_ia: mensajeIa,\n      email_destinatario: emailDestinatario\n    }\n  }));\n\n} catch (er) {\n  console.log(\"Error al parsear JSON de Lía:\", er);\n  \n  // Devolver un item de error\n  return [{\n    json: {\n      error: \"Error al parsear el JSON\",\n      details: er.message,\n      originalOutput: item.json.output || 'Sin salida disponible'\n    }\n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -704,
+        496
+      ],
+      "id": "37d48916-8e9d-46db-abe6-4303497da5d6",
+      "name": "Ordenar y formatear el output de PIKI"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body }}",
+        "options": {
+          "systemMessage": "=Eres Piki, asistente de logística. Respondes en JSON crudo (sin markdown).\n\n═══ REGLAS CRÍTICAS ═══\n1. Respuesta: SOLO JSON → {\"intencion\":\"...\", \"datos\":[...], \"query_sql\":\"...\", \"mensaje_ia\":\"...\", \"email_destinatario\":\"...\"}\n2. Sin bloques ```json, sin texto extra, sin markdown\n3. Usa herramienta PostgreSQL (NO generes queries con LLM)\n4. Alias SQL con comillas dobles: AS \"Nombre Legible\"\n5. NO uses tildes en SQL\n6. datos: [] si no hay resultados (NUNCA [{}])\n7. Prohibido: INSERT, UPDATE, DELETE, DROP, mostrar estructura BD\n\n═══ FORMATO JSON ═══\n{\n  \"intencion\": \"visualizar|descargar|drive|enviar\",\n  \"datos\": [{\"Col1\":\"val1\"}],  // [] si vacío\n  \"query_sql\": \"SELECT...\",     // null si no aplica\n  \"mensaje_ia\": \"respuesta al usuario\",\n  \"email_destinatario\": \"solo si intencion=enviar\"\n}\n\n═══ VISTAS BD (esquema public.*) ═══\nvw_tracking: codigo_envio, peso, largo, alto, ancho, tipo_envio, fecha_creacion, nombre_remitente, apellido_remitente, email_remitente, localidad_remitente, provincia_remitente, direccion_remitente_completa, nombre_destinatario, apellido_destinatario, email_destinatario, localidad_destino, provincia_destino, direccion_destino_completa, estado_actual, fecha_ultimo_movimiento, centro_actual, repartidor_actual, motivo_fallo\n\nvw_historial_movimientos: codigo_envio, fecha_hora_movimiento, estado, centro_distribucion, repartidor_responsable, motivo_de_fallo\n\nvw_envios_fallidos_detalle: codigo_envio, remitente_nombre, remitente_email, destinatario_nombre, destinatario_direccion, motivo_de_fallo, fecha_fallo, fecha_creacion\n\nvw_repartidor_localidades: legajo, nombre_repartidor, telefono_repartidor, email_repartidor, localidad_asignada, provincia_asignada, codigo_postal\n\nvw_tasa_exito_repartidores: repartidor_nombre, total_intentos_entrega, total_entregados, total_fallidos, tasa_exito_porcentaje\n\n═══ INTENCIONES ═══\n- \"visualizar\" (default): mostrar en consola\n- \"descargar\": usuario dice \"exportar/descargar\"\n- \"drive\": usuario dice \"subir a Drive\"\n- \"enviar\": usuario dice \"enviar por mail/correo\"\n\n═══ CONVERSACIONAL ═══\nTienes memoria de contexto. Referencias válidas:\nU: \"Envíos fallidos\" → T: \"15 envíos fallidos\"\nU: \"¿De CABA?\" → T: \"De esos 15, 8 son de CABA\"\nSi ambiguo: pregunta en mensaje_ia\n\n═══ EJEMPLOS ═══\nU: \"hola\"\n→ {\"intencion\":\"visualizar\",\"datos\":[],\"query_sql\":null,\"mensaje_ia\":\"¡Hola! Soy Piki. ¿En qué puedo ayudarte?\",\"email_destinatario\":null}\n\nU: \"envíos fallidos\"\n→ {\"intencion\":\"visualizar\",\"datos\":[{\"Cód. Envío\":\"AB001\",\"Motivo\":\"Dir incorrecta\"}],\"query_sql\":\"SELECT...\",\"mensaje_ia\":\"1 envío fallido encontrado\",\"email_destinatario\":null}\n\nU: \"enviame eso a juan@mail.com\"\n→ {\"intencion\":\"enviar\",\"datos\":[...],\"query_sql\":\"...\",\"mensaje_ia\":\"Reporte enviado\",\"email_destinatario\":\"juan@mail.com\"}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        -1184,
+        496
+      ],
+      "id": "80dfb2fc-4b3e-4bbf-baae-3cf2b8f5fcca",
+      "name": "PIKI"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "piki",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1456,
+        496
+      ],
+      "id": "4d89d30f-4797-40e4-8b93-a1f864e119a0",
+      "name": "Inicio - Recibe JSON desde Python",
+      "webhookId": "59268f78-51e2-4e6d-b750-9d97b4e60375"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "binaryPropertyName": "=data",
+        "options": {
+          "fileName": "Informe"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        864,
+        16
+      ],
+      "id": "f5c8888f-96af-468c-b83b-280c4424a308",
+      "name": "Drive - Convierte a .xlsx"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "binaryPropertyName": "=data",
+        "options": {
+          "fileName": "Informe"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        880,
+        512
+      ],
+      "id": "ee9fa1cb-78b7-4717-a635-cc98e0678b23",
+      "name": "Gmail - Convierte a .xlsx"
+    },
+    {
+      "parameters": {
+        "name": "Nuevo excel",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1dfi7DdAvSl2FV8-vLe2MoxZ8uj2kl3X8",
+          "mode": "list",
+          "cachedResultName": "Pruebas de Drive - n8n",
+          "cachedResultUrl": "[https://drive.google.com/drive/folders/1dfi7DdAvSl2FV8-vLe2MoxZ8uj2kl3X8](https://drive.google.com/drive/folders/1dfi7DdAvSl2FV8-vLe2MoxZ8uj2kl3X8)"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1280,
+        16
+      ],
+      "id": "e8211fa4-2025-484d-9d2d-2089a104c43b",
+      "name": "Drive - Sube el archivo",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "AAPtAoRnzlWAfLIR",
+          "name": "Google Drive account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Ordenar y formatear el output de PIKI').first().json.email_destinatario }}",
+        "subject": "Informe",
+        "message": "<div style=\"font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f2f5f8; padding: 40px 20px;\">      <div style=\"max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1);\">          <div style=\"background-color: #5dade2; padding: 30px 40px; text-align: center;\">                <img src=\"[https://i.imgur.com/v96Pqz3.png](https://i.imgur.com/v96Pqz3.png)\" alt=\"Piki Robot\" style=\"width: 140px; height: auto; display: block; margin: 0 auto 15px auto;\">                <h1 style=\"color: #ffffff; margin: 0; font-size: 22px; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.1);\">¡Nuevo informe listo!</h1>     </div>          <div style=\"padding: 40px;\">       <p style=\"color: #333333; font-size: 16px; line-height: 1.6; margin-top: 0;\">         <strong>¡Hola! Soy Piki 📦</strong>       </p>       <p style=\"color: #555555; font-size: 16px; line-height: 1.6;\">         Te traigo buenas noticias: el proceso automático ha terminado correctamente. Acá tenes el informe que solicitaste.       </p>              <p style=\"color: #555555; font-size: 16px; line-height: 1.6; margin-top: 30px;\">         ¡Que tengas un excelente día!       </p>     </div>          <div style=\"background-color: #eeeeee; padding: 15px; text-align: center; font-size: 12px; color: #888888;\">       Enviado automáticamente • Powered by n8n & Piki     </div>        </div> </div>",
+        "options": {
+          "attachmentsUi": {
+            "attachmentsBinary": [
+              {
+                "property": "=data"
+              }
+            ]
+          },
+          "senderName": "PIKI"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1280,
+        512
+      ],
+      "id": "2c1ac2dc-f1ca-4ead-bde1-92ff3708818c",
+      "name": "Gmail - Genera y envía el correo",
+      "webhookId": "ce5c64f6-ff13-4f67-80f3-9e45909679c0",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "6QOrtv6JtEppg6HI",
+          "name": "GoogleAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst datos = items.map(item => item.json.data);\n\n\nconst metadata = items[0].json;\n\nreturn [{\n  json: {\n    data: datos,\n    intencion: metadata.intencion\n  }\n}]\n\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        1008
+      ],
+      "id": "8e3121d5-8166-4530-9e71-be3835e422a7",
+      "name": "Visualizar - Extrae los datos e intención"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  return {\n    json: item.json.data\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        512
+      ],
+      "id": "ea35b6bb-b7fe-4557-ad61-6cd883412cbb",
+      "name": "Gmail -  Extrae los datos"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => {\n  return {\n    json: item.json.data\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        496,
+        16
+      ],
+      "id": "2fd97c4b-ac2f-45c5-b755-4029ad40f9bb",
+      "name": "Drive - Extrae los datos"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cc040b19-7385-441f-af4d-0a30cc519038",
+                    "leftValue": "={{ $('Ordenar y formatear el output de PIKI').item.json.intencion }}",
+                    "rightValue": "drive",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "f3a5616d-a8ed-4252-a243-2ee5b3abfca3",
+                    "leftValue": "={{ $('Ordenar y formatear el output de PIKI').item.json.intencion }}",
+                    "rightValue": "enviar",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "0229d61d-4836-4d67-88da-695dad368dc2",
+                    "leftValue": "={{ $('Ordenar y formatear el output de PIKI').item.json.intencion == 'descargar' || $('Ordenar y formatear el output de PIKI').item.json.intencion == 'visualizar' }}",
+                    "rightValue": "descargar",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        112,
+        496
+      ],
+      "id": "20bedb9e-3c1e-4550-a4ae-33b2debb0c49",
+      "name": "Elección según la intención"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"data\": \"{{ $json.webViewLink }}\",\n  \"mensaje_ia\" : \"{{ $('Ordenar y formatear el output de PIKI').first().json.mensaje_ia }}\"\n} ",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1696,
+        512
+      ],
+      "id": "5aef1071-da91-484b-bf75-c7da5179ed83",
+      "name": "PIKI - Devuelvo el mensaje y los datos enviados por mail"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"url\": \"{{ $json.webViewLink }}\",\n  \"mensaje_ia\": \"{{ $('Ordenar y formatear el output de PIKI').first().json.mensaje_ia }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1680,
+        16
+      ],
+      "id": "28e8c117-7c32-4adf-9535-aa38f55505d1",
+      "name": "PIKI - Comparto el link al Drive"
+    },
+    {
+      "parameters": {
+        "content": "## Punto de entrada\n- Recibe la HTTP Request de Python que solicita datos.\n- Es un trigger, se activa cuando se \"convoca\" la solicitud o petición.\n",
+        "height": 352,
+        "width": 336
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1568,
+        336
+      ],
+      "typeVersion": 1,
+      "id": "34e5faf7-b55b-4250-bd82-e34d249fbf9d",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## PIKI 🤖\n- Procesa la solicitud del usuario, la analiza y genera una salida.\n- La salida producida pueden ser datos obtenidos desde Supabase o mensajes conversacionales\n\n",
+        "height": 304,
+        "width": 336,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1232,
+        336
+      ],
+      "typeVersion": 1,
+      "id": "35c6d5a4-cdf7-4cf1-b38e-389525f07929",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## Modelo de lenguaje\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n- Gemini 2.5 Flash\n- Baja temperatura, menos alucianaciones, trabajo más específico",
+        "height": 320,
+        "width": 336,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1552,
+        800
+      ],
+      "typeVersion": 1,
+      "id": "b5588096-eb15-4b21-9ecd-1522fcec1d46",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## Memoria\n\n\n\n\n\n\n\n\n\n\n\n\n\n- Ventana de contexto, permite recordar mensajes del usuario.\n- Facilita el prompting, no es necesario que el usuario genere soliciutdes exactas.\n- Permite el uso de lenguaje natural y no el uso de \"ordenes directas\". ",
+        "height": 384,
+        "width": 336,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -1216,
+        800
+      ],
+      "typeVersion": 1,
+      "id": "35c31dde-8b5f-4695-b0b5-0b345002a62a",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "## Consultas SQL\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n- Se encarga de comunicarse con Supabase a traves de consultas SQL.\n- Permite a PIKI acceder a los datos reales de la base de datos.",
+        "height": 384,
+        "width": 336,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -880,
+        800
+      ],
+      "typeVersion": 1,
+      "id": "04758a95-6d98-4dce-9a39-67f33a0d9545",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "## Formateo y estructuración de la salida\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n- La salida generada por PIKI es formateada con una estructura estandarizada.\n- Permite establecer una comunicación efectiva y estándar con el programa  de Python.",
+        "height": 400,
+        "width": 448
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -880,
+        384
+      ],
+      "typeVersion": 1,
+      "id": "a7c373dd-78b5-4d37-ba5b-e98ef0da568d",
+      "name": "Sticky Note6"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        96,
+        -64
+      ],
+      "id": "bfb83882-e59a-4de0-9a28-7b1dd2d09c71",
+      "name": "Respuesta a consulta sin datos generados"
+    },
+    {
+      "parameters": {
+        "content": "## Verificación de campos\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n### Valida que:\n1. La consulta a PIKI haya retornado datos\n2. Que haya un correo electrónico válido para enviar un reporte si se solicitara.",
+        "height": 368,
+        "width": 400,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -432,
+        384
+      ],
+      "typeVersion": 1,
+      "id": "2b4c99b4-a933-4612-a6e1-fdd112d9b129",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c9e39130-f1e2-4b5e-9a4f-bb907d5c6f5a",
+              "leftValue": "={{ $json.data }}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "empty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "85610e11-84f3-4c18-aa2d-15cc8b3f87ae",
+              "leftValue": "={{ ($json.accion === 'enviar' && !$json.email_destinatario) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -288,
+        496
+      ],
+      "id": "05f4a4fa-fb0a-4a7b-8b5f-c640af0423e4",
+      "name": "Verifico los campos",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "content": "## Elige un camino\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n### 1. Google Drive\n- Sube a Google Drive el reporte generado con los datos obtenidos de Supabase.\n### 2. Enviar correo por Gmail\n- Enviar un reporte por Gmail, por esto se valida que el usuario haya indicado un correo electrónico válido.\n### 3. Visualización de los datos\n- Se devuelven los datos obtenidos de la consulta para que puedan mostrarse desde la interfaz.",
+        "height": 576,
+        "width": 400,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -32,
+        384
+      ],
+      "typeVersion": 1,
+      "id": "08373b20-df54-49b8-8aad-b40557c629ec",
+      "name": "Sticky Note7"
+    },
+    {
+      "parameters": {
+        "content": "## Si no se solicitaron datos...\n- PIKI responde con lengauje natural.\n- Permite mantener conversaciones.\n- Permite entender las necesidades del usuario y así saber qué camino debería elegir PIKI para resolver la problemática.\n",
+        "height": 448,
+        "width": 432,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -64,
+        -256
+      ],
+      "typeVersion": 1,
+      "id": "75aa98aa-e75d-4ec3-b7ca-14ea42245125",
+      "name": "Sticky Note8"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1696,
+        1008
+      ],
+      "id": "e25fbcb7-68ae-41fa-8d00-b6db79546b3c",
+      "name": "PIKI - Devuelve los datos bien estructurados"
+    },
+    {
+      "parameters": {
+        "content": "## Estructuración de la información\n\n\n\n\n\n\n\n\n\n\n\n### Estructura\n- Datos: Información recolectada de la base de datos preparada para Python\n\n\n",
+        "height": 352,
+        "width": 336
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        384,
+        416
+      ],
+      "typeVersion": 1,
+      "id": "183d79c6-4835-4d2b-a353-6696e67b396b",
+      "name": "Sticky Note10"
+    },
+    {
+      "parameters": {
+        "content": "## Estructuración de la información\n\n\n\n\n\n\n\n\n\n\n\n### Estructura\n- Datos: Información recolectada de la base de datos preparada para Python\n\n\n",
+        "height": 368,
+        "width": 336
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        384,
+        -96
+      ],
+      "typeVersion": 1,
+      "id": "082a47cb-b98d-405c-b684-64cbe9e121c8",
+      "name": "Sticky Note12"
+    },
+    {
+      "parameters": {
+        "content": "## Estructuración de la información\n\n\n\n\n\n\n\n\n\n\n\n### Estructura\n- Datos: Información recolectada de la base de datos preparada para Python\n- Intención: Es la acción que desea raelizar el usuario y es identificada por PIKI\n",
+        "height": 384,
+        "width": 336
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        384,
+        912
+      ],
+      "typeVersion": 1,
+      "id": "927c1442-8ed4-4671-a626-b39e9b62c5ff",
+      "name": "Sticky Note13"
+    },
+    {
+      "parameters": {
+        "content": "## Generación de reporte\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n### Información\n- Genera el reporte a parti de los datos extraídos de Supabase\n- Genera un archivo .xlsx correctamente estructurado",
+        "height": 368,
+        "width": 400,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        720,
+        -96
+      ],
+      "typeVersion": 1,
+      "id": "92d0075b-6df9-44a3-8f7c-25954484695f",
+      "name": "Sticky Note11"
+    },
+    {
+      "parameters": {
+        "content": "## Generación de reporte\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n### Información\n- Genera el reporte a parti de los datos extraídos de Supabase\n- Genera un archivo .xlsx correctamente estructurado",
+        "height": 368,
+        "width": 400,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        736,
+        400
+      ],
+      "typeVersion": 1,
+      "id": "f3059722-eef9-46b2-9578-31a84ad5cb18",
+      "name": "Sticky Note14"
+    },
+    {
+      "parameters": {
+        "content": "## Compartir en Drive\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n### Resultado\n- Se comparte un link al usuario del reporte generado anteriormente",
+        "height": 368,
+        "width": 400,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1120,
+        -96
+      ],
+      "typeVersion": 1,
+      "id": "3065302d-2f04-49a8-bd7a-3ed07e144859",
+      "name": "Sticky Note15"
+    },
+    {
+      "parameters": {
+        "content": "## Enviar por correo electrónico\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n### Resultado\n- Se envía un correo electrónico con el reporte generado anteriormente a la dirección de correo compartida durante la conversación",
+        "height": 368,
+        "width": 400,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1136,
+        400
+      ],
+      "typeVersion": 1,
+      "id": "fde3f28b-51ff-4909-bbe8-142c9fcf224a",
+      "name": "Sticky Note16"
+    },
+    {
+      "parameters": {
+        "content": "## Devolución al usuario\n- Link al Drive donde está subido el reporte generado\n- Mensaje de PIKI notificando de que se compartió el link correctaemnte",
+        "height": 448,
+        "width": 432,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1520,
+        -160
+      ],
+      "typeVersion": 1,
+      "id": "4fed5021-e796-4e8a-8404-078be9136944",
+      "name": "Sticky Note9"
+    },
+    {
+      "parameters": {
+        "content": "## Devolución al usuario\n- Mensaje notificando al usuario que el correo fue enviado correctamente a su bandeja de entrada",
+        "height": 448,
+        "width": 432,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1536,
+        336
+      ],
+      "typeVersion": 1,
+      "id": "8f28268f-b105-4c58-9b06-3cbbc02098d6",
+      "name": "Sticky Note17"
+    },
+    {
+      "parameters": {
+        "content": "## Devolución al usuario\n- Respuesta de PIKI sobre la información solicitada\n- Datos obtenidos de Supabase para generar una visualización de los mismos",
+        "height": 448,
+        "width": 432,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1536,
+        816
+      ],
+      "typeVersion": 1,
+      "id": "08f80a12-f943-4acc-bd8b-117591fdb081",
+      "name": "Sticky Note18"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Memoria de PIKI": {
+      "ai_memory": [
+        [
+          {
+            "node": "PIKI",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultas SQL de PIKI": {
+      "ai_tool": [
+        [
+          {
+            "node": "PIKI",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM de PIKI": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "PIKI",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ordenar y formatear el output de PIKI": {
+      "main": [
+        [
+          {
+            "node": "Verifico los campos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PIKI": {
+      "main": [
+        [
+          {
+            "node": "Ordenar y formatear el output de PIKI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inicio - Recibe JSON desde Python": {
+      "main": [
+        [
+          {
+            "node": "PIKI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive - Convierte a .xlsx": {
+      "main": [
+        [
+          {
+            "node": "Drive - Sube el archivo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail - Convierte a .xlsx": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Genera y envía el correo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive - Sube el archivo": {
+      "main": [
+        [
+          {
+            "node": "PIKI - Comparto el link al Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail - Genera y envía el correo": {
+      "main": [
+        [
+          {
+            "node": "PIKI - Devuelvo el mensaje y los datos enviados por mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Visualizar - Extrae los datos e intención": {
+      "main": [
+        [
+          {
+            "node": "PIKI - Devuelve los datos bien estructurados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail -  Extrae los datos": {
+      "main": [
+        [
+          {
+            "node": "Gmail - Convierte a .xlsx",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Drive - Extrae los datos": {
+      "main": [
+        [
+          {
+            "node": "Drive - Convierte a .xlsx",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Elección según la intención": {
+      "main": [
+        [
+          {
+            "node": "Drive - Extrae los datos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gmail -  Extrae los datos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Visualizar - Extrae los datos e intención",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verifico los campos": {
+      "main": [
+        [
+          {
+            "node": "Respuesta a consulta sin datos generados",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Elección según la intención",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "4cc76068-371e-4c6c-98ce-786054a4ee89",
+  "meta": {
+    "instanceId": "f7a4a94f5f7ee7f6806649e1110e45e48afcaf655789941b1dc8c39976cde587"
+  },
+  "id": "gZiAI1pa7z8iKP3t",
+  "tags": []
+}

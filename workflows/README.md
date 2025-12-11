@@ -1,17 +1,17 @@
 # Sistema Tracking - Grupo 6
 
-**Versión:** 2.1.0 (Update Piki & Modular Refactor)  
+**Versión:** 18.0.0 (Final Version)  
 **Fecha:** 05-12-2025
 
 ## 1. Estado Actual del Flujo (Snapshot)
 
-El flujo ha evolucionado hacia una arquitectura más limpia y robusta. El "Cerebro" ahora tiene personalidad definida ("Piki") y capacidad de generar respuestas en lenguaje natural, además de orquestar las consultas a base de datos.
+El flujo ha evolucionado hacia una arquitectura más limpia y robusta. El "Cerebro" ahora tiene personalidad definida ("Piki") y capacidad de generar respuestas en lenguaje natural, además de orquestar las consultas a base de datos. Finalmente, todas las funciones principales han sido solventadas.
 
 - **Punto de Entrada:**
   - **Producción:** Webhook (`POST /prueba`). Diseñado para ser consumido por el cliente en **Python**.
   - **Sesión:** Utiliza `sessionId` del cuerpo de la solicitud para mantener contexto conversacional
 - **Cerebro (AI Agent):** Agente actualizado a **"Piki"** con Gemini AI.
-  - _Mejora v2.1:_ Ahora devuelve un campo `mensaje_ia` con un mensaje amigable en lenguaje natural, además de la data estructurada.
+  - _Mejora v18.0.0:_ Ahora devuelve un campo `mensaje_ia` con un mensaje amigable en lenguaje natural, además de la data estructurada.
   - _Sistema de memoria:_ Mantiene contexto de conversación con hasta 7 mensajes previos
   - _Integración con Postgres:_ Utiliza herramienta SQL para consultas directas a la base de datos
 - **Validación de Datos:**
@@ -90,7 +90,7 @@ graph TD
 
 ## 2. Registro de Cambios (Changelog)
 
-### ✅ Hitos Completados (v2.1)
+### ✅ Hitos Completados (v18.0.0)
 
 #### Sistema de Memoria Conversacional
 - **Implementado:** Simple Memory con contexto de 7 mensajes
@@ -123,20 +123,16 @@ graph TD
 - Los datos se retornan al cliente Python para procesamiento local
 - El cliente maneja la generación del archivo (no n8n)
 
-### 🚧 Tareas Pendientes (Backlog)
-
-1. **Optimización de Prompts:** Continuar refinando el System Prompt de Piki para mejorar la precisión de las respuestas y reducir alucinaciones.
-
-2. **Refactorización JS:** Consolidar los múltiples nodos de "Code in JavaScript" que realizan limpieza similar en diferentes ramas. Implementar DRY (Don't Repeat Yourself) con funciones reutilizables.
-
-3. **Métricas y Logging:** Implementar seguimiento de uso (queries más frecuentes, tiempos de respuesta, errores) para optimización continua.
-
-4. **Caché de Queries:** Para consultas frecuentes idénticas, implementar sistema de caché temporal para mejorar velocidad de respuesta.
-
 ---
 
 ## 3. Flujo Actual
 
-![Workflow v16](./images/25-11-25.png)
+![Workflow v16](./images/11-12-25.png)
 
-> **Nota:** La imagen puede no reflejar todos los cambios de v2.1. Referirse al diagrama Mermaid para arquitectura actualizada.
+<div align="center">
+
+**Proyecto finalizado** <br>
+**Hecho con ❤️ durante la Capacitación en Artech**
+
+
+</div>
