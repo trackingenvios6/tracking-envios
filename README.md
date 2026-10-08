@@ -62,7 +62,7 @@ pip install -r requirements.txt
 
 ### Paso 1: Clonar o descargar el proyecto
 ```bash
-git clone <url-del-repositorio>
+git clone <https://github.com/trackingenvios6/tracking-envios>
 cd tracking-envios
 ```
 
